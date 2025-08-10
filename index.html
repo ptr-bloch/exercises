@@ -333,8 +333,10 @@ const cloud=document.getElementById('cloud');
 const playBtn=document.getElementById('playBtn');
 let sForm=document.getElementById('sForm'), sRu=document.getElementById('sRu');
 const overlay=document.getElementById('overlay'), tip=document.getElementById('tip'), dir=document.getElementById('direction'), target=document.getElementById('target'), restartBtn=document.getElementById('restart'), negSmile=document.getElementById('negSmile');
-// FIX: declare currentWord before any use (avoids TDZ ReferenceError)
+// Declare before any use to avoid TDZ errors
 let currentWord = '';
+// Use var to avoid TDZ for speech voice across any hoisted usage
+var ttsVoice = null;
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 function layoutOptions(container,nodes){const n=nodes.length,cols=Math.ceil(Math.sqrt(n)),rows=Math.ceil(n/cols);const cw=container.clientWidth/cols,ch=Math.max(container.clientHeight/rows,60);const cells=[];for(let r=0;r<rows;r++) for(let c=0;c<cols;c++) cells.push({r,c});shuffle(cells);nodes.forEach((el,i)=>{const {r,c}=cells[i];const pad=10;const x=c*cw+pad+Math.random()*(cw-el.offsetWidth-2*pad);const y=r*ch+pad+Math.random()*(ch-el.offsetHeight-2*pad);el.style.left=x+'px';el.style.top=y+'px';el.style.setProperty('--dx',(3+Math.random()*6)+'px');el.style.setProperty('--dy',(3+Math.random()*6)+'px');el.style.animationDelay=(-Math.random()*8)+'s';});}
 function showNegSmile(){negSmile.classList.add('show');setTimeout(()=>negSmile.classList.remove('show'),1000);} 
@@ -433,6 +435,8 @@ function spawn(){
   });
   requestAnimationFrame(()=>layoutOptions(cloud,els));
   stageStart = performance.now();
+  // Auto-play the next word and switch button label to "Repeat"
+  autoSpeakNext();
 }
 
 function maybeNext(){
@@ -466,25 +470,39 @@ function autoRestart(){ correctCount=0; totalCount=sampleSize; round=0; stageTim
 document.getElementById('restart').onclick=()=>{ if(locked) return; autoRestart(); };
 
 // ---- TTS (Web Speech API) ----
-let voice = null;
 function pickVoice(){
   const voices = window.speechSynthesis ? speechSynthesis.getVoices() : [];
   if(!voices || !voices.length) return null;
-  // prefer en-US/en-GB
   const preferred = voices.find(v=>/^en\-US/i.test(v.lang)) || voices.find(v=>/^en\-GB/i.test(v.lang));
   return preferred || voices.find(v=>/^en/i.test(v.lang)) || voices[0];
 }
-function updateVoice(){ voice = pickVoice(); playBtn.disabled = !voice; playBtn.textContent = voice? '▶ Play' : 'No audio'; }
+function updateVoice(){ ttsVoice = pickVoice(); playBtn.disabled = !ttsVoice; playBtn.textContent = ttsVoice? (playBtn.textContent==='Repeat'?'Repeat':'▶ Play') : 'No audio'; }
+function speakCurrent(){
+  if(!('speechSynthesis' in window)) return;
+  if(!ttsVoice) updateVoice();
+  if(!ttsVoice || !currentWord) return;
+  const u = new SpeechSynthesisUtterance(currentWord);
+  u.voice = ttsVoice; u.lang = ttsVoice.lang || 'en-US';
+  speechSynthesis.cancel();
+  speechSynthesis.speak(u);
+  playBtn.textContent = 'Repeat';
+}
+function autoSpeakNext(){
+  if(!('speechSynthesis' in window)) return;
+  if(!ttsVoice){
+    updateVoice();
+    if(!ttsVoice){
+      const once = ()=>{ speechSynthesis.onvoiceschanged = null; updateVoice(); if(ttsVoice) speakCurrent(); };
+      speechSynthesis.onvoiceschanged = once;
+      return;
+    }
+  }
+  setTimeout(speakCurrent, 50);
+}
 if('speechSynthesis' in window){
   speechSynthesis.onvoiceschanged = updateVoice;
   updateVoice();
-  playBtn.addEventListener('click',()=>{
-    if(!voice || !currentWord) return;
-    const u = new SpeechSynthesisUtterance(currentWord);
-    u.voice = voice; u.lang = voice.lang || 'en-US';
-    speechSynthesis.cancel();
-    speechSynthesis.speak(u);
-  });
+  playBtn.addEventListener('click',()=>{ speakCurrent(); });
 } else {
   playBtn.disabled = true; playBtn.textContent = 'No audio';
 }
@@ -534,8 +552,9 @@ if('speechSynthesis' in window){
     console.assert(b.correct===3 && b.total===61,'score model mix');
   })();
 
-  // New: TTS currentWord should be set after first spawn
+  // TTS: currentWord set and ttsVoice variable exists
   console.assert(typeof currentWord === 'string' && currentWord.length>0, 'currentWord is initialized');
+  console.assert(typeof ttsVoice !== 'undefined', 'ttsVoice defined');
 })();
 </script>
 </body>
