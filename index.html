@@ -52,6 +52,9 @@
   /* Hide animation for non-selected after solve */
   .vanish{animation:vanish .25s ease forwards}
   @keyframes vanish{to{opacity:0;transform:scale(.9)}}
+  /* Play button */
+  .playbtn{margin-top:4px; font-size:16px; padding:10px 18px; border-radius:999px; border:1px solid #2b3157; background:#121630; color:var(--text); cursor:pointer}
+  .playbtn:disabled{opacity:.5; cursor:not-allowed}
 </style>
 </head>
 <body>
@@ -59,7 +62,7 @@
   <header>
     <h1>Pluralization Trainer</h1>
     <div class="pill" id="round">0/60</div>
-    <div class="pill" id="score">0</div>
+    <div class="pill" id="score">0/0</div>
     <div class="pill" id="avg">Avg: —</div>
   </header>
   <div class="board" id="board">
@@ -71,7 +74,7 @@
     <div class="neg-smile" id="negSmile">☹️</div>
     <div class="target">
       <div class="small" id="direction">Singular → Plural & Translation</div>
-      <div class="word" id="target">word</div>
+      <button class="playbtn" id="playBtn" title="Play pronunciation" aria-label="Play pronunciation">▶ Play</button>
       <div class="msg" id="tip">Pick the correct <b>plural</b> and the correct <b>Russian translation</b>. Wrong = 10s lock with rule/explanation.</div>
       <div>
         <button id="restart">Restart</button>
@@ -323,11 +326,15 @@ const WORDS = [
 ];
 
 // ---------------- Game logic ----------------
-let questions=[], round=0, score=0, locked=false, lockTimer=null, remaining=0; let stageStart=0; const stageTimes=[];
-let formDone=false, ruDone=false;
+let questions=[], round=0, locked=false, lockTimer=null, remaining=0; let stageStart=0; const stageTimes=[];
+let formDone=false, ruDone=false, stageHadError=false;
+let correctCount=0, totalCount=0; // score model: correct/total
 const cloud=document.getElementById('cloud');
+const playBtn=document.getElementById('playBtn');
 let sForm=document.getElementById('sForm'), sRu=document.getElementById('sRu');
 const overlay=document.getElementById('overlay'), tip=document.getElementById('tip'), dir=document.getElementById('direction'), target=document.getElementById('target'), restartBtn=document.getElementById('restart'), negSmile=document.getElementById('negSmile');
+// FIX: declare currentWord before any use (avoids TDZ ReferenceError)
+let currentWord = '';
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 function layoutOptions(container,nodes){const n=nodes.length,cols=Math.ceil(Math.sqrt(n)),rows=Math.ceil(n/cols);const cw=container.clientWidth/cols,ch=Math.max(container.clientHeight/rows,60);const cells=[];for(let r=0;r<rows;r++) for(let c=0;c<cols;c++) cells.push({r,c});shuffle(cells);nodes.forEach((el,i)=>{const {r,c}=cells[i];const pad=10;const x=c*cw+pad+Math.random()*(cw-el.offsetWidth-2*pad);const y=r*ch+pad+Math.random()*(ch-el.offsetHeight-2*pad);el.style.left=x+'px';el.style.top=y+'px';el.style.setProperty('--dx',(3+Math.random()*6)+'px');el.style.setProperty('--dy',(3+Math.random()*6)+'px');el.style.animationDelay=(-Math.random()*8)+'s';});}
 function showNegSmile(){negSmile.classList.add('show');setTimeout(()=>negSmile.classList.remove('show'),1000);} 
@@ -382,10 +389,7 @@ function makeWrongForms(w){
 }
 function buildCombinedOptions(w){
   // plural candidates: must contain the word itself and correct plural, no duplicates
-  const forms = new Set();
-  forms.add(w.singular);
-  forms.add(w.plural);
-  makeWrongForms(w).forEach(f=>forms.add(f));
+  const forms = new Set([w.singular, w.plural, ...makeWrongForms(w)]);
   const formOpts = Array.from(forms).slice(0,7).map(t=>({type:'form', text:t}));
   // ru candidates (exactly 4)
   const ruSet = new Set([w.ru]);
@@ -400,9 +404,11 @@ function spawn(){
   cloud.innerHTML='<div class="badge">Find: plural & translation</div><div class="status"><div class="s" id="sForm">plural</div><div class="s" id="sRu">ru</div></div>';
   sForm=document.getElementById('sForm');
   sRu=document.getElementById('sRu');
-  formDone=false; ruDone=false;
+  formDone=false; ruDone=false; stageHadError=false;
   const w=questions[round];
-  target.textContent=w.singular; dir.textContent='Singular → Plural & Translation';
+  // set current word for TTS
+  currentWord = w.singular;
+  // rebuild options
   const opts=buildCombinedOptions(w);
   const els=[]; const seen=new Set();
   opts.forEach(o=>{
@@ -415,13 +421,13 @@ function spawn(){
         const ok = (o.text.toLowerCase()===w.plural.toLowerCase());
         animateChoice(d,ok);
         if(ok){ formDone=true; keepOnlyType('form', d); maybeNext(); }
-        else{ const keyRule = w.rule; setLocked(true,10,keyRule || 'addS'); }
+        else{ stageHadError=true; totalCount++; updateHUD(); const keyRule = w.rule; setLocked(true,10,keyRule || 'addS'); }
       } else { // ru
         if(ruDone) return;
         const ok = (o.text===w.ru);
         animateChoice(d,ok);
         if(ok){ ruDone=true; keepOnlyType('ru', d); maybeNext(); }
-        else{ setLocked(true,10,'translation'); }
+        else{ stageHadError=true; totalCount++; updateHUD(); setLocked(true,10,'translation'); }
       }
     };
   });
@@ -433,12 +439,14 @@ function maybeNext(){
   if(formDone && ruDone){
     const took = (performance.now() - stageStart) / 1000;
     stageTimes.push(took);
-    score++; document.getElementById('score').textContent=score; tip.className='msg good'; tip.textContent=`Both correct! Time: ${took.toFixed(2)}s · Avg: ${avgTime().toFixed(2)}s`;
+    if(!stageHadError){ correctCount++; }
+    updateHUD();
+    tip.className='msg good'; tip.textContent=`Stage solved. ${stageHadError? 'Error made → no credit.' : 'Perfect! +1'} · Time: ${took.toFixed(2)}s · Avg: ${avgTime().toFixed(2)}s`;
     setTimeout(()=>{
       round++;
       if(round>=questions.length){
         tip.className='msg good';
-        tip.textContent=`Done! Score: ${score}/60 · Avg time: ${avgTime().toFixed(2)}s`;
+        tip.textContent=`Done! Score: ${correctCount}/${totalCount} · Avg time: ${avgTime().toFixed(2)}s`;
         return;
       }
       updateHUD();
@@ -448,14 +456,38 @@ function maybeNext(){
 }
 
 function avgTime(){ if(stageTimes.length===0) return 0; return stageTimes.reduce((a,b)=>a+b,0)/stageTimes.length; }
-function updateHUD(){ document.getElementById('round').textContent=(round+1)+'/60'; document.getElementById('avg').textContent = stageTimes.length? `Avg: ${avgTime().toFixed(2)}s` : 'Avg: —'; }
+function updateHUD(){ document.getElementById('round').textContent=(round+1)+'/60'; document.getElementById('avg').textContent = stageTimes.length? `Avg: ${avgTime().toFixed(2)}s` : 'Avg: —'; document.getElementById('score').textContent = `${correctCount}/${totalCount}`; }
 const sampleSize = 60;
 function seedQuestions(){ questions = shuffle(WORDS.slice()).slice(0,sampleSize); }
 
 autoRestart();
-function autoRestart(){ score=0; round=0; stageTimes.length=0; seedQuestions(); document.getElementById('score').textContent='0'; updateHUD(); spawn(); }
+function autoRestart(){ correctCount=0; totalCount=sampleSize; round=0; stageTimes.length=0; seedQuestions(); updateHUD(); spawn(); }
 
 document.getElementById('restart').onclick=()=>{ if(locked) return; autoRestart(); };
+
+// ---- TTS (Web Speech API) ----
+let voice = null;
+function pickVoice(){
+  const voices = window.speechSynthesis ? speechSynthesis.getVoices() : [];
+  if(!voices || !voices.length) return null;
+  // prefer en-US/en-GB
+  const preferred = voices.find(v=>/^en\-US/i.test(v.lang)) || voices.find(v=>/^en\-GB/i.test(v.lang));
+  return preferred || voices.find(v=>/^en/i.test(v.lang)) || voices[0];
+}
+function updateVoice(){ voice = pickVoice(); playBtn.disabled = !voice; playBtn.textContent = voice? '▶ Play' : 'No audio'; }
+if('speechSynthesis' in window){
+  speechSynthesis.onvoiceschanged = updateVoice;
+  updateVoice();
+  playBtn.addEventListener('click',()=>{
+    if(!voice || !currentWord) return;
+    const u = new SpeechSynthesisUtterance(currentWord);
+    u.voice = voice; u.lang = voice.lang || 'en-US';
+    speechSynthesis.cancel();
+    speechSynthesis.speak(u);
+  });
+} else {
+  playBtn.disabled = true; playBtn.textContent = 'No audio';
+}
 
 // ---------------- Lightweight Tests (console) ----------------
 (function runTests(){
@@ -466,19 +498,19 @@ document.getElementById('restart').onclick=()=>{ if(locked) return; autoRestart(
   console.assert(get('tomato').plural==='tomatoes' && get('tomato').rule==='oEs','tomato test');
   console.assert(get('fish').plural==='fish' && get('fish').rule==='invariant','fish test');
   console.assert(get('man').plural==='men' && get('man').rule==='irregular','man test');
+  console.assert(document.getElementById('playBtn'), 'play button exists');
 
-  // New tests for singular presence and de-dup on invariant
+  // Singular presence and de-dup on invariant
   const c = get('city');
   const combinedCity = buildCombinedOptions(c);
   const formCity = combinedCity.filter(x=>x.type==='form').map(x=>x.text);
   console.assert(formCity.includes('city') && formCity.includes('cities'),'city & cities present in options');
-
   const f = get('fish');
   const combinedFish = buildCombinedOptions(f);
   const fishCount = combinedFish.filter(x=>x.type==='form' && x.text==='fish').length;
   console.assert(fishCount===1,'fish present exactly once in forms');
 
-  // ru mix size
+  // RU options count
   const w = get('book');
   const combined = buildCombinedOptions(w);
   const ruCount = combined.filter(x=>x.type==='ru').length;
@@ -488,7 +520,22 @@ document.getElementById('restart').onclick=()=>{ if(locked) return; autoRestart(
   console.assert(formOptsOnly.every(t=>allowed.has(t)),'form options only from current word forms');
   console.assert(combined.some(x=>x.type==='form' && x.text==='books'),'combined has correct plural');
   console.assert(combined.some(x=>x.type==='ru' && x.text===w.ru),'combined has correct ru');
-  console.info('Light tests passed');
+
+  // Score model tests (pure simulation)
+  (function scoreModelTest(){
+    function simulate(stageErrors){
+      let correct=0, total=60; // baseline
+      for(const errs of stageErrors){ if(errs>0){ total += errs; } else { correct++; } }
+      return {correct,total};
+    }
+    const a = simulate([2]); // two wrongs then solve ⇒ no credit
+    console.assert(a.correct===0 && a.total===62,'score model: 2 errors => 0/62');
+    const b = simulate([0,0,1,0]); // two perfect, one with 1 error, one perfect
+    console.assert(b.correct===3 && b.total===61,'score model mix');
+  })();
+
+  // New: TTS currentWord should be set after first spawn
+  console.assert(typeof currentWord === 'string' && currentWord.length>0, 'currentWord is initialized');
 })();
 </script>
 </body>
