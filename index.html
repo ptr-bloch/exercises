@@ -55,27 +55,53 @@
   /* Play button */
   .playbtn{margin-top:4px; font-size:16px; padding:10px 18px; border-radius:999px; border:1px solid #2b3157; background:#121630; color:var(--text); cursor:pointer}
   .playbtn:disabled{opacity:.5; cursor:not-allowed}
+  /* Start screen */
+  .start-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,12,24,.85);backdrop-filter:blur(2px);z-index:1200}
+  .start-panel{display:flex;flex-direction:column;gap:16px;align-items:center}
+  .start-btn{width:200px;height:200px;border-radius:50%;border:2px solid #2b3157;background:#0e1328;color:var(--text);font-size:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+  .start-btn:active{transform:scale(.98)}
+  .row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+  .chip{border:1px solid #2b3157;background:#0e1328;color:var(--text);padding:8px 12px;border-radius:999px;cursor:pointer;font-size:14px}
+  .chip[aria-pressed="true"]{background:#1a2247;border-color:#3c4b93}
+  .toggle{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:14px}
+  .link{color:var(--accent);cursor:pointer;text-decoration:underline}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
     <h1>Pluralization Trainer</h1>
-    <div class="pill" id="round">0/60</div>
+    <div class="pill" id="round">0/10</div>
     <div class="pill" id="score">0/0</div>
     <div class="pill" id="avg">Avg: —</div>
   </header>
   <div class="board" id="board">
     <div class="cloud" id="cloud">
-      <div class="badge">Find: plural & translation</div>
-      <div class="status"><div class="s" id="sForm">plural</div><div class="s" id="sRu">ru</div></div>
+      <div class="badge" id="badge">Find: translation → plural</div>
+      <div class="status" id="status"><div class="s" id="sRu">ru</div><div class="s" id="sForm">plural</div></div>
     </div>
     <div class="overlay" id="overlay" aria-hidden="true"></div>
     <div class="neg-smile" id="negSmile">☹️</div>
+    <!-- Start overlay -->
+    <div class="start-overlay" id="startOverlay">
+      <div class="start-panel" id="startPanel">
+        <div class="row" id="countRow" aria-label="Word count">
+          <button class="chip" data-n="10" aria-pressed="true">10</button>
+          <button class="chip" data-n="20">20</button>
+          <button class="chip" data-n="35">35</button>
+          <button class="chip" data-n="50">50</button>
+        </div>
+        <label class="toggle"><input type="checkbox" id="toggleRu" checked /> Include translations (RU)</label>
+        <div class="row">
+          <span class="link" id="viewResultsLink">View results</span>
+        </div>
+        <button class="start-btn" id="startBtn">Start</button>
+      </div>
+    </div>
     <div class="target">
-      <div class="small" id="direction">Singular → Plural & Translation</div>
-      <button class="playbtn" id="playBtn" title="Play pronunciation" aria-label="Play pronunciation">▶ Play</button>
-      <div class="msg" id="tip">Pick the correct <b>plural</b> and the correct <b>Russian translation</b>. Wrong = 10s lock with rule/explanation.</div>
+      <div class="small" id="direction">Step 1: choose translation → Step 2: choose plural</div>
+      <button class="playbtn" id="playBtn" title="Play pronunciation" aria-label="Play pronunciation">Repeat</button>
+      <div class="msg" id="tip">Pick the correct <b>translation</b> first. Wrong = 10s lock with rule (EN/RU).</div>
       <div>
         <button id="restart">Restart</button>
       </div>
@@ -83,6 +109,13 @@
   </div>
 </div>
 <script>
+// Short aliases for DOM lookups
+const ge = id => document.getElementById(id);
+const qs = sel => document.querySelector(sel);
+
+// dataset index constants
+const S=0,P=1,R=2,RU=3;
+
 // ---------------- Rules ----------------
 const RULES = {
   addS: { en: "Regular nouns add -s (book → books).", ru: "Обычные существительные образуют множественное число с помощью -s (book → books)." },
@@ -97,465 +130,540 @@ const RULES = {
 };
 
 // ---------------- Unified dataset: WORDS ----------------
-// Each item: { singular, plural, rule, ru }
+// Each item now is an array: [singular, plural, ruleKey, russian]
 const WORDS = [
   // Irregulars
-  {singular:'man', plural:'men', rule:'irregular', ru:'мужчина'},
-  {singular:'woman', plural:'women', rule:'irregular', ru:'женщина'},
-  {singular:'child', plural:'children', rule:'irregular', ru:'ребёнок'},
-  {singular:'person', plural:'people', rule:'irregular', ru:'человек'},
-  {singular:'mouse', plural:'mice', rule:'irregular', ru:'мышь'},
-  {singular:'foot', plural:'feet', rule:'irregular', ru:'ступня'},
-  {singular:'tooth', plural:'teeth', rule:'irregular', ru:'зуб'},
-  {singular:'goose', plural:'geese', rule:'irregular', ru:'гусь'},
+  ['man','men','irregular','мужчина'],
+  ['woman','women','irregular','женщина'],
+  ['child','children','irregular','ребёнок'],
+  ['person','people','irregular','человек'],
+  ['mouse','mice','irregular','мышь'],
+  ['foot','feet','irregular','ступня'],
+  ['tooth','teeth','irregular','зуб'],
+  ['goose','geese','irregular','гусь'],
   // f/fe → ves
-  {singular:'leaf', plural:'leaves', rule:'fToVes', ru:'лист'},
-  {singular:'wife', plural:'wives', rule:'fToVes', ru:'жена'},
-  {singular:'life', plural:'lives', rule:'fToVes', ru:'жизнь'},
-  {singular:'knife', plural:'knives', rule:'fToVes', ru:'нож'},
-  {singular:'half', plural:'halves', rule:'fToVes', ru:'половина'},
-  {singular:'shelf', plural:'shelves', rule:'fToVes', ru:'полка'},
+  ['leaf','leaves','fToVes','лист'],
+  ['wife','wives','fToVes','жена'],
+  ['life','lives','fToVes','жизнь'],
+  ['knife','knives','fToVes','нож'],
+  ['half','halves','fToVes','половина'],
+  ['shelf','shelves','fToVes','полка'],
   // Sibilant + es
-  {singular:'bus', plural:'buses', rule:'sibilantEs', ru:'автобус'},
-  {singular:'box', plural:'boxes', rule:'sibilantEs', ru:'коробка'},
-  {singular:'church', plural:'churches', rule:'sibilantEs', ru:'церковь'},
-  {singular:'class', plural:'classes', rule:'sibilantEs', ru:'класс'},
-  {singular:'glass', plural:'glasses', rule:'sibilantEs', ru:'стакан'},
-  {singular:'watch', plural:'watches', rule:'sibilantEs', ru:'часы'},
-  {singular:'match', plural:'matches', rule:'sibilantEs', ru:'спичка'},
-  {singular:'beach', plural:'beaches', rule:'sibilantEs', ru:'пляж'},
-  {singular:'dress', plural:'dresses', rule:'sibilantEs', ru:'платье'},
-  {singular:'kiss', plural:'kisses', rule:'sibilantEs', ru:'поцелуй'},
+  ['bus','buses','sibilantEs','автобус'],
+  ['box','boxes','sibilantEs','коробка'],
+  ['church','churches','sibilantEs','церковь'],
+  ['class','classes','sibilantEs','класс'],
+  ['glass','glasses','sibilantEs','стакан'],
+  ['watch','watches','sibilantEs','часы'],
+  ['match','matches','sibilantEs','спичка'],
+  ['beach','beaches','sibilantEs','пляж'],
+  ['dress','dresses','sibilantEs','платье'],
+  ['kiss','kisses','sibilantEs','поцелуй'],
   // y → ies
-  {singular:'city', plural:'cities', rule:'yToIes', ru:'город'},
-  {singular:'story', plural:'stories', rule:'yToIes', ru:'рассказ'},
-  {singular:'baby', plural:'babies', rule:'yToIes', ru:'младенец'},
-  {singular:'berry', plural:'berries', rule:'yToIes', ru:'ягода'},
-  {singular:'lady', plural:'ladies', rule:'yToIes', ru:'дама'},
-  {singular:'country', plural:'countries', rule:'yToIes', ru:'страна'},
-  {singular:'family', plural:'families', rule:'yToIes', ru:'семья'},
-  {singular:'party', plural:'parties', rule:'yToIes', ru:'вечеринка'},
-  {singular:'body', plural:'bodies', rule:'yToIes', ru:'тело'},
-  {singular:'library', plural:'libraries', rule:'yToIes', ru:'библиотека'},
-  {singular:'sky', plural:'skies', rule:'yToIes', ru:'небо'},
+  ['city','cities','yToIes','город'],
+  ['story','stories','yToIes','рассказ'],
+  ['baby','babies','yToIes','младенец'],
+  ['berry','berries','yToIes','ягода'],
+  ['lady','ladies','yToIes','дама'],
+  ['country','countries','yToIes','страна'],
+  ['family','families','yToIes','семья'],
+  ['party','parties','yToIes','вечеринка'],
+  ['body','bodies','yToIes','тело'],
+  ['library','libraries','yToIes','библиотека'],
+  ['sky','skies','yToIes','небо'],
   // -o words
-  {singular:'tomato', plural:'tomatoes', rule:'oEs', ru:'помидор'},
-  {singular:'potato', plural:'potatoes', rule:'oEs', ru:'картофель'},
-  {singular:'hero', plural:'heroes', rule:'oEs', ru:'герой'},
-  {singular:'echo', plural:'echoes', rule:'oEs', ru:'эхо'},
-  {singular:'mango', plural:'mangoes', rule:'oEs', ru:'манго'},
-  {singular:'volcano', plural:'volcanoes', rule:'oEs', ru:'вулкан'},
-  {singular:'photo', plural:'photos', rule:'addS', ru:'фото'},
-  {singular:'piano', plural:'pianos', rule:'addS', ru:'пианино'},
-  {singular:'radio', plural:'radios', rule:'addS', ru:'радио'},
-  {singular:'video', plural:'videos', rule:'addS', ru:'видео'},
-  {singular:'zoo', plural:'zoos', rule:'addS', ru:'зоопарк'},
-  {singular:'kangaroo', plural:'kangaroos', rule:'addS', ru:'кенгуру'},
-  {singular:'zero', plural:'zeros', rule:'addS', ru:'ноль'},
+  ['tomato','tomatoes','oEs','помидор'],
+  ['potato','potatoes','oEs','картофель'],
+  ['hero','heroes','oEs','герой'],
+  ['echo','echoes','oEs','эхо'],
+  ['mango','mangoes','oEs','манго'],
+  ['volcano','volcanoes','oEs','вулкан'],
+  ['photo','photos','addS','фото'],
+  ['piano','pianos','addS','пианино'],
+  ['radio','radios','addS','радио'],
+  ['video','videos','addS','видео'],
+  ['zoo','zoos','addS','зоопарк'],
+  ['kangaroo','kangaroos','addS','кенгуру'],
+  ['zero','zeros','addS','ноль'],
   // Invariant (zero-plural)
-  {singular:'fish', plural:'fish', rule:'invariant', ru:'рыба'},
-  {singular:'sheep', plural:'sheep', rule:'invariant', ru:'овца'},
-  {singular:'deer', plural:'deer', rule:'invariant', ru:'олень'},
-  {singular:'species', plural:'species', rule:'invariant', ru:'вид'},
-  {singular:'series', plural:'series', rule:'invariant', ru:'серия'},
-  {singular:'aircraft', plural:'aircraft', rule:'invariant', ru:'самолёт'},
-  {singular:'salmon', plural:'salmon', rule:'invariant', ru:'лосось'},
-  {singular:'trout', plural:'trout', rule:'invariant', ru:'форель'},
-  {singular:'swine', plural:'swine', rule:'invariant', ru:'свинья'},
-  {singular:'moose', plural:'moose', rule:'invariant', ru:'лось'},
-  {singular:'bison', plural:'bison', rule:'invariant', ru:'бизон'},
-  {singular:'offspring', plural:'offspring', rule:'invariant', ru:'потомство'},
-  {singular:'ice', plural:'ice', rule:'invariant', ru:'лёд'},
-  // Regular addS (sample — many to reach >100 words)
-  {singular:'book', plural:'books', rule:'addS', ru:'книга'},
-  {singular:'cat', plural:'cats', rule:'addS', ru:'кошка'},
-  {singular:'dog', plural:'dogs', rule:'addS', ru:'собака'},
-  {singular:'car', plural:'cars', rule:'addS', ru:'машина'},
-  {singular:'pen', plural:'pens', rule:'addS', ru:'ручка'},
-  {singular:'house', plural:'houses', rule:'addS', ru:'дом'},
-  {singular:'tree', plural:'trees', rule:'addS', ru:'дерево'},
-  {singular:'flower', plural:'flowers', rule:'addS', ru:'цветок'},
-  {singular:'river', plural:'rivers', rule:'addS', ru:'река'},
-  {singular:'school', plural:'schools', rule:'addS', ru:'школа'},
-  {singular:'chair', plural:'chairs', rule:'addS', ru:'стул'},
-  {singular:'desk', plural:'desks', rule:'addS', ru:'письменный стол'},
-  {singular:'shoe', plural:'shoes', rule:'addS', ru:'туфля'},
-  {singular:'door', plural:'doors', rule:'addS', ru:'дверь'},
-  {singular:'hat', plural:'hats', rule:'addS', ru:'шляпа'},
-  {singular:'apple', plural:'apples', rule:'addS', ru:'яблоко'},
-  {singular:'orange', plural:'oranges', rule:'addS', ru:'апельсин'},
-  {singular:'banana', plural:'bananas', rule:'addS', ru:'банан'},
-  {singular:'plate', plural:'plates', rule:'addS', ru:'тарелка'},
-  {singular:'cup', plural:'cups', rule:'addS', ru:'чашка'},
-  {singular:'day', plural:'days', rule:'addS', ru:'день'},
-  {singular:'toy', plural:'toys', rule:'addS', ru:'игрушка'},
-  {singular:'key', plural:'keys', rule:'addS', ru:'ключ'},
-  {singular:'valley', plural:'valleys', rule:'addS', ru:'долина'},
-  {singular:'monkey', plural:'monkeys', rule:'addS', ru:'обезьяна'},
-  {singular:'donkey', plural:'donkeys', rule:'addS', ru:'осёл'},
-  {singular:'boy', plural:'boys', rule:'addS', ru:'мальчик'},
-  {singular:'guy', plural:'guys', rule:'addS', ru:'парень'},
-  {singular:'holiday', plural:'holidays', rule:'addS', ru:'праздник'},
-  {singular:'chimney', plural:'chimneys', rule:'addS', ru:'дымоход'},
-  {singular:'journey', plural:'journeys', rule:'addS', ru:'путешествие'},
-  {singular:'essay', plural:'essays', rule:'addS', ru:'эссе'},
-  {singular:'delay', plural:'delays', rule:'addS', ru:'задержка'},
-  {singular:'roof', plural:'roofs', rule:'addS', ru:'крыша'},
-  {singular:'bag', plural:'bags', rule:'addS', ru:'сумка'},
-  {singular:'ball', plural:'balls', rule:'addS', ru:'мяч'},
-  {singular:'bank', plural:'banks', rule:'addS', ru:'банк'},
-  {singular:'bed', plural:'beds', rule:'addS', ru:'кровать'},
-  {singular:'bell', plural:'bells', rule:'addS', ru:'колокол'},
-  {singular:'bike', plural:'bikes', rule:'addS', ru:'велосипед'},
-  {singular:'bird', plural:'birds', rule:'addS', ru:'птица'},
-  {singular:'boat', plural:'boats', rule:'addS', ru:'лодка'},
-  {singular:'bridge', plural:'bridges', rule:'addS', ru:'мост'},
-  {singular:'brother', plural:'brothers', rule:'addS', ru:'брат'},
-  {singular:'cake', plural:'cakes', rule:'addS', ru:'торт'},
-  {singular:'call', plural:'calls', rule:'addS', ru:'звонок'},
-  {singular:'cap', plural:'caps', rule:'addS', ru:'кепка'},
-  {singular:'card', plural:'cards', rule:'addS', ru:'карта'},
-  {singular:'carpet', plural:'carpets', rule:'addS', ru:'ковёр'},
-  {singular:'chicken', plural:'chickens', rule:'addS', ru:'курица'},
-  {singular:'clock', plural:'clocks', rule:'addS', ru:'часы'},
-  {singular:'cloud', plural:'clouds', rule:'addS', ru:'облако'},
-  {singular:'coat', plural:'coats', rule:'addS', ru:'пальто'},
-  {singular:'color', plural:'colors', rule:'addS', ru:'цвет'},
-  {singular:'computer', plural:'computers', rule:'addS', ru:'компьютер'},
-  {singular:'cook', plural:'cooks', rule:'addS', ru:'повар'},
-  {singular:'dad', plural:'dads', rule:'addS', ru:'папа'},
-  {singular:'dance', plural:'dances', rule:'addS', ru:'танец'},
-  {singular:'doll', plural:'dolls', rule:'addS', ru:'кукла'},
-  {singular:'dream', plural:'dreams', rule:'addS', ru:'сон'},
-  {singular:'drink', plural:'drinks', rule:'addS', ru:'напиток'},
-  {singular:'ear', plural:'ears', rule:'addS', ru:'ухо'},
-  {singular:'egg', plural:'eggs', rule:'addS', ru:'яйцо'},
-  {singular:'eye', plural:'eyes', rule:'addS', ru:'глаз'},
-  {singular:'face', plural:'faces', rule:'addS', ru:'лицо'},
-  {singular:'farm', plural:'farms', rule:'addS', ru:'ферма'},
-  {singular:'father', plural:'fathers', rule:'addS', ru:'отец'},
-  {singular:'field', plural:'fields', rule:'addS', ru:'поле'},
-  {singular:'finger', plural:'fingers', rule:'addS', ru:'палец'},
-  {singular:'flag', plural:'flags', rule:'addS', ru:'флаг'},
-  {singular:'food', plural:'foods', rule:'addS', ru:'еда'},
-  {singular:'friend', plural:'friends', rule:'addS', ru:'друг'},
-  {singular:'game', plural:'games', rule:'addS', ru:'игра'},
-  {singular:'garden', plural:'gardens', rule:'addS', ru:'сад'},
-  {singular:'girl', plural:'girls', rule:'addS', ru:'девочка'},
-  {singular:'glove', plural:'gloves', rule:'addS', ru:'перчатка'},
-  {singular:'goat', plural:'goats', rule:'addS', ru:'коза'},
-  {singular:'grass', plural:'grasses', rule:'sibilantEs', ru:'трава'},
-  {singular:'ground', plural:'grounds', rule:'addS', ru:'земля'},
-  {singular:'group', plural:'groups', rule:'addS', ru:'группа'},
-  {singular:'hand', plural:'hands', rule:'addS', ru:'рука'},
-  {singular:'head', plural:'heads', rule:'addS', ru:'голова'},
-  {singular:'hill', plural:'hills', rule:'addS', ru:'холм'},
-  {singular:'home', plural:'homes', rule:'addS', ru:'дом'},
-  {singular:'horse', plural:'horses', rule:'addS', ru:'лошадь'},
-  {singular:'hospital', plural:'hospitals', rule:'addS', ru:'больница'},
-  {singular:'idea', plural:'ideas', rule:'addS', ru:'идея'},
-  {singular:'jam', plural:'jams', rule:'addS', ru:'варенье'},
-  {singular:'job', plural:'jobs', rule:'addS', ru:'работа'},
-  {singular:'kid', plural:'kids', rule:'addS', ru:'ребёнок'},
-  {singular:'king', plural:'kings', rule:'addS', ru:'король'},
-  {singular:'lake', plural:'lakes', rule:'addS', ru:'озеро'},
-  {singular:'leg', plural:'legs', rule:'addS', ru:'нога'},
-  {singular:'letter', plural:'letters', rule:'addS', ru:'письмо'},
-  {singular:'lip', plural:'lips', rule:'addS', ru:'губа'},
-  {singular:'lock', plural:'locks', rule:'addS', ru:'замок'},
-  {singular:'map', plural:'maps', rule:'addS', ru:'карта'},
-  {singular:'market', plural:'markets', rule:'addS', ru:'рынок'},
-  {singular:'moon', plural:'moons', rule:'addS', ru:'луна'},
-  {singular:'mother', plural:'mothers', rule:'addS', ru:'мать'},
-  {singular:'mountain', plural:'mountains', rule:'addS', ru:'гора'},
-  {singular:'mouth', plural:'mouths', rule:'addS', ru:'рот'},
-  {singular:'name', plural:'names', rule:'addS', ru:'имя'},
-  {singular:'nest', plural:'nests', rule:'addS', ru:'гнездо'},
-  {singular:'night', plural:'nights', rule:'addS', ru:'ночь'},
-  {singular:'nose', plural:'noses', rule:'addS', ru:'нос'},
-  {singular:'office', plural:'offices', rule:'addS', ru:'офис'},
-  {singular:'page', plural:'pages', rule:'addS', ru:'страница'},
-  {singular:'pain', plural:'pains', rule:'addS', ru:'боль'},
-  {singular:'paper', plural:'papers', rule:'addS', ru:'бумага'},
-  {singular:'park', plural:'parks', rule:'addS', ru:'парк'},
-  {singular:'pencil', plural:'pencils', rule:'addS', ru:'карандаш'},
-  {singular:'picture', plural:'pictures', rule:'addS', ru:'картинка'},
-  {singular:'pig', plural:'pigs', rule:'addS', ru:'свинья'},
-  {singular:'plane', plural:'planes', rule:'addS', ru:'самолёт'},
-  {singular:'plant', plural:'plants', rule:'addS', ru:'растение'},
-  {singular:'queen', plural:'queens', rule:'addS', ru:'королева'},
-  {singular:'question', plural:'questions', rule:'addS', ru:'вопрос'},
-  {singular:'rat', plural:'rats', rule:'addS', ru:'крыса'},
-  {singular:'road', plural:'roads', rule:'addS', ru:'дорога'},
-  {singular:'rock', plural:'rocks', rule:'addS', ru:'камень'},
-  {singular:'room', plural:'rooms', rule:'addS', ru:'комната'},
-  {singular:'rose', plural:'roses', rule:'addS', ru:'роза'},
-  {singular:'sea', plural:'seas', rule:'addS', ru:'море'},
-  {singular:'ship', plural:'ships', rule:'addS', ru:'корабль'},
-  {singular:'shirt', plural:'shirts', rule:'addS', ru:'рубашка'},
-  {singular:'shop', plural:'shops', rule:'addS', ru:'магазин'},
-  {singular:'sister', plural:'sisters', rule:'addS', ru:'сестра'},
-  {singular:'snake', plural:'snakes', rule:'addS', ru:'змея'},
-  {singular:'son', plural:'sons', rule:'addS', ru:'сын'},
-  {singular:'song', plural:'songs', rule:'addS', ru:'песня'},
-  {singular:'star', plural:'stars', rule:'addS', ru:'звезда'},
-  {singular:'stone', plural:'stones', rule:'addS', ru:'камень'},
-  {singular:'street', plural:'streets', rule:'addS', ru:'улица'},
-  {singular:'student', plural:'students', rule:'addS', ru:'студент'},
-  {singular:'sun', plural:'suns', rule:'addS', ru:'солнце'},
-  {singular:'table', plural:'tables', rule:'addS', ru:'стол'},
-  {singular:'teacher', plural:'teachers', rule:'addS', ru:'учитель'},
-  {singular:'team', plural:'teams', rule:'addS', ru:'команда'},
-  {singular:'thing', plural:'things', rule:'addS', ru:'вещь'},
-  {singular:'time', plural:'times', rule:'addS', ru:'время'},
-  {singular:'town', plural:'towns', rule:'addS', ru:'городок'},
-  {singular:'train', plural:'trains', rule:'addS', ru:'поезд'},
-  {singular:'tree', plural:'trees', rule:'addS', ru:'дерево'},
-  {singular:'way', plural:'ways', rule:'addS', ru:'путь'},
-  {singular:'week', plural:'weeks', rule:'addS', ru:'неделя'},
-  {singular:'window', plural:'windows', rule:'addS', ru:'окно'},
-  {singular:'wood', plural:'woods', rule:'addS', ru:'дерево'},
-  {singular:'word', plural:'words', rule:'addS', ru:'слово'},
-  {singular:'work', plural:'works', rule:'addS', ru:'работа'},
-  {singular:'year', plural:'years', rule:'addS', ru:'год'},
-  {singular:'airport', plural:'airports', rule:'addS', ru:'аэропорт'},
-  {singular:'airplane', plural:'airplanes', rule:'addS', ru:'самолёт'},
-  {singular:'animal', plural:'animals', rule:'addS', ru:'животное'},
-  {singular:'answer', plural:'answers', rule:'addS', ru:'ответ'},
-  {singular:'artist', plural:'artists', rule:'addS', ru:'художник'}
+  ['fish','fish','invariant','рыба'],
+  ['sheep','sheep','invariant','овца'],
+  ['deer','deer','invariant','олень'],
+  ['species','species','invariant','вид'],
+  ['series','series','invariant','серия'],
+  ['aircraft','aircraft','invariant','самолёт'],
+  ['salmon','salmon','invariant','лосось'],
+  ['trout','trout','invariant','форель'],
+  ['swine','swine','invariant','свинья'],
+  ['moose','moose','invariant','лось'],
+  ['bison','bison','invariant','бизон'],
+  ['offspring','offspring','offspring','потомство'],
+  ['ice','ice','invariant','лёд'],
+  // Regular addS (sample)
+  ['book','books','addS','книга'],
+  ['cat','cats','addS','кошка'],
+  ['dog','dogs','addS','собака'],
+  ['car','cars','addS','машина'],
+  ['pen','pens','addS','ручка'],
+  ['house','houses','addS','дом'],
+  ['tree','trees','addS','дерево'],
+  ['flower','flowers','addS','цветок'],
+  ['river','rivers','addS','река'],
+  ['school','schools','addS','школа'],
+  ['chair','chairs','addS','стул'],
+  ['desk','desks','addS','письменный стол'],
+  ['shoe','shoes','addS','туфля'],
+  ['door','doors','addS','дверь'],
+  ['hat','hats','addS','шляпа'],
+  ['apple','apples','addS','яблоко'],
+  ['orange','oranges','addS','апельсин'],
+  ['banana','bananas','addS','банан'],
+  ['plate','plates','addS','тарелка'],
+  ['cup','cups','addS','чашка'],
+  ['day','days','addS','день'],
+  ['toy','toys','addS','игрушка'],
+  ['key','keys','addS','ключ'],
+  ['valley','valleys','addS','долина'],
+  ['monkey','monkeys','addS','обезьяна'],
+  ['donkey','donkeys','addS','осёл'],
+  ['boy','boys','addS','мальчик'],
+  ['guy','guys','addS','парень'],
+  ['holiday','holidays','addS','праздник'],
+  ['chimney','chimneys','addS','дымоход'],
+  ['journey','journeys','addS','путешествие'],
+  ['essay','essays','addS','эссе'],
+  ['delay','delays','addS','задержка'],
+  ['roof','roofs','addS','крыша'],
+  ['bag','bags','addS','сумка'],
+  ['ball','balls','addS','мяч'],
+  ['bank','banks','addS','банк'],
+  ['bed','beds','addS','кровать'],
+  ['bell','bells','addS','колокол'],
+  ['bike','bikes','addS','велосипед'],
+  ['bird','birds','addS','птица'],
+  ['boat','boats','addS','лодка'],
+  ['bridge','bridges','addS','мост'],
+  ['brother','brothers','addS','брат'],
+  ['cake','cakes','addS','торт'],
+  ['call','calls','addS','звонок'],
+  ['cap','caps','addS','кепка'],
+  ['card','cards','addS','карта'],
+  ['carpet','carpets','addS','ковёр'],
+  ['chicken','chickens','addS','курица'],
+  ['clock','clocks','addS','часы'],
+  ['cloud','clouds','addS','облако'],
+  ['coat','coats','addS','пальто'],
+  ['color','colors','addS','цвет'],
+  ['computer','computers','addS','компьютер'],
+  ['cook','cooks','addS','повар'],
+  ['dad','dads','addS','папа'],
+  ['dance','dances','addS','танец'],
+  ['doll','dolls','addS','кукла'],
+  ['dream','dreams','addS','сон'],
+  ['drink','drinks','addS','напиток'],
+  ['ear','ears','addS','ухо'],
+  ['egg','eggs','addS','яйцо'],
+  ['eye','eyes','addS','глаз'],
+  ['face','faces','addS','лицо'],
+  ['farm','farms','addS','ферма'],
+  ['father','fathers','addS','отец'],
+  ['field','fields','addS','поле'],
+  ['finger','fingers','addS','палец'],
+  ['flag','flags','addS','флаг'],
+  ['food','foods','addS','еда'],
+  ['friend','friends','addS','друг'],
+  ['game','games','addS','игра'],
+  ['garden','gardens','addS','сад'],
+  ['girl','girls','addS','девочка'],
+  ['glove','gloves','addS','перчатка'],
+  ['goat','goats','addS','коза'],
+  ['grass','grasses','sibilantEs','трава'],
+  ['ground','grounds','addS','земля'],
+  ['group','groups','addS','группа'],
+  ['hand','hands','addS','рука'],
+  ['head','heads','addS','голова'],
+  ['hill','hills','addS','холм'],
+  ['home','homes','addS','дом'],
+  ['horse','horses','addS','лошадь'],
+  ['hospital','hospitals','addS','больница'],
+  ['idea','ideas','addS','идея'],
+  ['jam','jams','addS','варенье'],
+  ['job','jobs','addS','работа'],
+  ['kid','kids','addS','ребёнок'],
+  ['king','kings','addS','король'],
+  ['lake','lakes','addS','озеро'],
+  ['leg','legs','addS','нога'],
+  ['letter','letters','addS','письмо'],
+  ['lip','lips','addS','губа'],
+  ['lock','locks','addS','замок'],
+  ['map','maps','addS','карта'],
+  ['market','markets','addS','рынок'],
+  ['moon','moons','addS','луна'],
+  ['mother','mothers','addS','мать'],
+  ['mountain','mountains','addS','гора'],
+  ['mouth','mouths','addS','рот'],
+  ['name','names','addS','имя'],
+  ['nest','nests','addS','гнездо'],
+  ['night','nights','addS','ночь'],
+  ['nose','noses','addS','нос'],
+  ['office','offices','addS','офис'],
+  ['page','pages','addS','страница'],
+  ['pain','pains','addS','боль'],
+  ['paper','papers','addS','бумага'],
+  ['park','parks','addS','парк'],
+  ['pencil','pencils','addS','карандаш'],
+  ['picture','pictures','addS','картинка'],
+  ['pig','pigs','addS','свинья'],
+  ['plane','planes','addS','самолёт'],
+  ['plant','plants','addS','растение'],
+  ['queen','queens','addS','королева'],
+  ['question','questions','addS','вопрос'],
+  ['rat','rats','addS','крыса'],
+  ['road','roads','addS','дорога'],
+  ['rock','rocks','addS','камень'],
+  ['room','rooms','addS','комната'],
+  ['rose','roses','addS','роза'],
+  ['sea','seas','addS','море'],
+  ['ship','ships','addS','корабль'],
+  ['shirt','shirts','addS','рубашка'],
+  ['shop','shops','addS','магазин'],
+  ['sister','sisters','addS','сестра'],
+  ['snake','snakes','addS','змея'],
+  ['son','sons','addS','сын'],
+  ['song','songs','addS','песня'],
+  ['star','stars','addS','звезда'],
+  ['stone','stones','addS','камень'],
+  ['street','streets','addS','улица'],
+  ['student','students','addS','студент'],
+  ['sun','suns','addS','солнце'],
+  ['table','tables','addS','стол'],
+  ['teacher','teachers','addS','учитель'],
+  ['team','teams','addS','команда'],
+  ['thing','things','addS','вещь'],
+  ['time','times','addS','время'],
+  ['town','towns','addS','городок'],
+  ['train','trains','addS','поезд'],
+  ['tree','trees','addS','дерево'],
+  ['way','ways','addS','путь'],
+  ['week','weeks','addS','неделя'],
+  ['window','windows','addS','окно'],
+  ['wood','woods','addS','дерево'],
+  ['word','words','addS','слово'],
+  ['work','works','addS','работа'],
+  ['year','years','addS','год'],
+  ['airport','airports','addS','аэропорт'],
+  ['airplane','airplanes','addS','самолёт'],
+  ['animal','animals','addS','животное'],
+  ['answer','answers','addS','ответ'],
+  ['artist','artists','addS','художник']
 ];
+
+// ---------------- Local "DB" (localStorage) ----------------
+const DB_KEY = 'pluralTrainerResultsV1';
+function loadResults(){ try{ return JSON.parse(localStorage.getItem(DB_KEY) || '[]'); }catch(e){ return []; } }
+function saveResult(row){ const all=loadResults(); all.push(row); localStorage.setItem(DB_KEY, JSON.stringify(all)); }
+function formatTS(ts){ const d=new Date(ts); const pad=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+function renderResultsPanel(){ const rows=loadResults().slice().sort((a,b)=>b.ts-a.ts).map(r=>`<tr>
+  <td>${formatTS(r.ts)}</td>
+  <td style="text-align:right">${r.words}</td>
+  <td style="text-align:right">${r.raw}/${r.rawMax}</td>
+  <td style="text-align:right">×${r.mult}</td>
+  <td style="text-align:right"><b>${r.final}</b></td>
+  <td style="text-align:right">${r.correct}/${r.total}</td>
+  <td>${r.mode}</td>
+  <td style="text-align:right">${r.avg.toFixed(2)}s</td>
+</tr>`).join('') || `<tr><td colspan="8" style="text-align:center;color:#aab0d6">No saved results yet</td></tr>`;
+  return `
+  <h2 style="margin:6px 0 6px 0; font-size:22px">Saved Results</h2>
+  <div style="max-height:48vh; overflow:auto; width:min(820px, 92vw); background:#0e1328; border:1px solid #27305a; border-radius:12px; padding:8px; margin-top:4px">
+    <table style="width:100%; border-collapse:collapse; font-size:14px">
+      <thead><tr>
+        <th style="text-align:left;padding:6px">Date</th>
+        <th style="text-align:right;padding:6px">Words</th>
+        <th style="text-align:right;padding:6px">Raw</th>
+        <th style="text-align:right;padding:6px">Mult</th>
+        <th style="text-align:right;padding:6px">Final</th>
+        <th style="text-align:right;padding:6px">Score</th>
+        <th style="text-align:left;padding:6px">Mode</th>
+        <th style="text-align:right;padding:6px">Avg time</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
 
 // ---------------- Game logic ----------------
 let questions=[], round=0, locked=false, lockTimer=null, remaining=0; let stageStart=0; const stageTimes=[];
 let formDone=false, ruDone=false, stageHadError=false;
+let formErr=false, ruErr=false;
+let points=0; // plural +1, translation +2 (only if that part had no error)
+const errorStats = new Map(); // rule -> {count, words:[]}
+function recordError(rule, word){ const key=rule||'addS'; const e=errorStats.get(key)||{count:0, words:[]}; e.count++; if(!e.words.includes(word) && e.words.length<2) e.words.push(word); errorStats.set(key,e);} 
 let correctCount=0, totalCount=0; // score model: correct/total
-const cloud=document.getElementById('cloud');
-const playBtn=document.getElementById('playBtn');
-let sForm=document.getElementById('sForm'), sRu=document.getElementById('sRu');
-const overlay=document.getElementById('overlay'), tip=document.getElementById('tip'), dir=document.getElementById('direction'), target=document.getElementById('target'), restartBtn=document.getElementById('restart'), negSmile=document.getElementById('negSmile');
-// Declare before any use to avoid TDZ errors
+const cloud=ge('cloud');
+const playBtn=ge('playBtn');
+let sForm=ge('sForm'), sRu=ge('sRu');
+const overlay=ge('overlay'), tip=ge('tip'), dir=ge('direction'), restartBtn=ge('restart'), negSmile=ge('negSmile');
+const startOverlay=ge('startOverlay');
+const startBtn=ge('startBtn');
+const countRow=ge('countRow');
+const toggleRu=ge('toggleRu');
+const badge=ge('badge');
+const statusBar=ge('status');
+const startPanel=ge('startPanel');
+const viewResultsLink=ge('viewResultsLink');
 let currentWord = '';
-// Use var to avoid TDZ for speech voice across any hoisted usage
 var ttsVoice = null;
+let sampleSize = 10; // default matches selected chip
+let includeTranslations = true; // toggle
+
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 function layoutOptions(container,nodes){const n=nodes.length,cols=Math.ceil(Math.sqrt(n)),rows=Math.ceil(n/cols);const cw=container.clientWidth/cols,ch=Math.max(container.clientHeight/rows,60);const cells=[];for(let r=0;r<rows;r++) for(let c=0;c<cols;c++) cells.push({r,c});shuffle(cells);nodes.forEach((el,i)=>{const {r,c}=cells[i];const pad=10;const x=c*cw+pad+Math.random()*(cw-el.offsetWidth-2*pad);const y=r*ch+pad+Math.random()*(ch-el.offsetHeight-2*pad);el.style.left=x+'px';el.style.top=y+'px';el.style.setProperty('--dx',(3+Math.random()*6)+'px');el.style.setProperty('--dy',(3+Math.random()*6)+'px');el.style.animationDelay=(-Math.random()*8)+'s';});}
 function showNegSmile(){negSmile.classList.add('show');setTimeout(()=>negSmile.classList.remove('show'),1000);} 
 function animateChoice(el,ok){
   el.classList.remove('yay','nay','flash-good','flash-bad');
-  void el.offsetWidth; // restart animation
-  el.classList.add(ok? 'yay':'nay');
+  void el.offsetWidth; el.classList.add(ok? 'yay':'nay');
   el.classList.add(ok? 'flash-good':'flash-bad');
   if(ok){
     const r = el.getBoundingClientRect();
     const base = cloud.getBoundingClientRect();
     const cx = r.left - base.left + r.width/2;
     const cy = r.top  - base.top  + r.height/2;
-    const fx = document.createElement('div');
-    fx.className = 'fx ok';
-    fx.style.left = cx + 'px';
-    fx.style.top  = cy + 'px';
+    const fx = document.createElement('div'); fx.className = 'fx ok'; fx.style.left = cx + 'px'; fx.style.top  = cy + 'px';
     const particles = 18;
-    for(let i=0;i<particles;i++){
-      const p = document.createElement('i');
-      p.style.setProperty('--a', (360/particles)*i);
-      p.style.setProperty('--d', (40 + Math.random()*26) + 'px');
-      fx.appendChild(p);
-    }
-    cloud.appendChild(fx);
-    setTimeout(()=>fx.remove(), 900);
-  } else {
-    showNegSmile();
-  }
+    for(let i=0;i<particles;i++){ const p = document.createElement('i'); p.style.setProperty('--a', (360/particles)*i); p.style.setProperty('--d', (40 + Math.random()*26) + 'px'); fx.appendChild(p);} cloud.appendChild(fx); setTimeout(()=>fx.remove(), 900);
+  } else { showNegSmile(); }
 }
-function setLocked(v,seconds=0,ruleKey=''){locked=v;restartBtn.disabled=v;overlay.className=v?'overlay show':'overlay';cloud.classList.toggle('locked',v);if(v){remaining=seconds;tip.className='msg bad';const update=()=>{tip.innerHTML=`<b>Rule (EN):</b> ${RULES[ruleKey].en} · <b>Правило (RU):</b> ${RULES[ruleKey].ru} · <span class=\"count\">${remaining}s</span>`;remaining--;if(remaining<0){clearInterval(lockTimer);setLocked(false);tip.className='msg';tip.textContent='Time is up. Try again.';}};update();lockTimer=setInterval(update,1000);}else{if(lockTimer) clearInterval(lockTimer);}}
+function setLocked(v,seconds=0,ruleKey=''){
+  locked=v; restartBtn.disabled=v; overlay.className=v?'overlay show':'overlay'; cloud.classList.toggle('locked',v);
+  if(v){ remaining=seconds; tip.className='msg bad';
+    const update=()=>{ const r=RULES[ruleKey]||RULES.addS; tip.innerHTML=`<b>Rule (EN):</b> ${r.en} · <b>Правило (RU):</b> ${r.ru} · <span class=\"count\">${remaining}s</span>`; remaining--; if(remaining<0){ clearInterval(lockTimer); setLocked(false); tip.className='msg'; tip.textContent='Time is up. Try again.'; } };
+    update(); lockTimer=setInterval(update,1000);
+  }else{ if(lockTimer) clearInterval(lockTimer); }
+}
 function keepOnlyType(type, selected){
-  cloud.querySelectorAll('.opt').forEach(n=>{
-    if(n!==selected && n.dataset.type===type){ n.classList.add('vanish'); setTimeout(()=>n.remove(),220); }
-  });
-  if(type==='form'){ sForm.classList.add('ok'); sForm.textContent='plural ✓'; }
-  if(type==='ru'){ sRu.classList.add('ok'); sRu.textContent='ru ✓'; }
+  cloud.querySelectorAll('.opt').forEach(n=>{ if(n!==selected && n.dataset.type===type){ n.classList.add('vanish'); setTimeout(()=>n.remove(),220); } });
+  if(type==='ru'){ if(sRu){ sRu.classList.add('ok'); sRu.textContent='ru ✓'; } tip.textContent='Now choose the plural form.'; }
+  if(type==='form'){ if(sForm){ sForm.classList.add('ok'); sForm.textContent='plural ✓'; } }
 }
 
-// ---- build options (one cloud) from unified WORDS ----
+// ---- options builders ----
 function makeWrongForms(w){
-  const wrong = new Set();
-  const correct = w.plural.toLowerCase();
-  const add = (s)=>{ if(s && s.toLowerCase()!==correct) wrong.add(s); };
-  add(w.singular+'s');
-  add(w.singular+'es');
-  if(/[^aeiou]y$/i.test(w.singular)) add(w.singular+'ys');
-  if(/(f|fe)$/i.test(w.singular)) add(w.singular.replace(/fe$/,'fes').replace(/f$/,'fs'));
-  add(w.singular+'x');
-  add(w.singular+'zz');
+  const wrong = new Set(); const correct = w[P].toLowerCase(); const add = (s)=>{ if(s && s.toLowerCase()!==correct) wrong.add(s); };
+  add(w[S]+'s'); add(w[S]+'es'); if(/[^aeiou]y$/i.test(w[S])) add(w[S]+'ys'); if(/(f|fe)$/i.test(w[S])) add(w[S].replace(/fe$/,'fes').replace(/f$/,'fs')); add(w[S]+'x'); add(w[S]+'zz');
   return Array.from(wrong);
 }
-function buildCombinedOptions(w){
-  // plural candidates: must contain the word itself and correct plural, no duplicates
-  const forms = new Set([w.singular, w.plural, ...makeWrongForms(w)]);
-  const formOpts = Array.from(forms).slice(0,7).map(t=>({type:'form', text:t}));
-  // ru candidates (exactly 4)
-  const ruSet = new Set([w.ru]);
-  const allRus = WORDS.map(x=>x.ru).filter(x=>x && x!==w.ru);
-  while(ruSet.size<4 && allRus.length){ ruSet.add(allRus[Math.floor(Math.random()*allRus.length)]); }
-  while(ruSet.size<4){ ruSet.add('—'); }
-  const ruOpts = Array.from(ruSet).slice(0,4).map(t=>({type:'ru', text:t}));
-  return shuffle([...formOpts, ...ruOpts]);
+function buildFormOptionsOnly(w){
+  const forms = new Set([w[S], w[P], ...makeWrongForms(w)]);
+  const arr = Array.from(forms);
+  return shuffle(arr.map(t=>({type:'form', text:t})).slice(0,7));
+}
+// 10 translation options (1 correct + 9 wrong)
+function buildRuOptionsOnly(w){
+  const ruSet = new Set([w[RU]]);
+  const pool = WORDS.map(x=>x[RU]).filter(x=>x && x!==w[RU]);
+  while(ruSet.size<10 && pool.length){ ruSet.add(pool[Math.floor(Math.random()*pool.length)]); }
+  while(ruSet.size<10){ ruSet.add('—'); }
+  return shuffle(Array.from(ruSet).slice(0,10).map(t=>({type:'ru', text:t})));
 }
 
-function spawn(){
-  cloud.innerHTML='<div class="badge">Find: plural & translation</div><div class="status"><div class="s" id="sForm">plural</div><div class="s" id="sRu">ru</div></div>';
-  sForm=document.getElementById('sForm');
-  sRu=document.getElementById('sRu');
-  formDone=false; ruDone=false; stageHadError=false;
-  const w=questions[round];
-  // set current word for TTS
-  currentWord = w.singular;
-  // rebuild options
-  const opts=buildCombinedOptions(w);
-  const els=[]; const seen=new Set();
-  opts.forEach(o=>{
-    const key=(o.type+'|'+o.text).toLowerCase(); if(seen.has(key)) return; seen.add(key);
+// ---- render steps ----
+function renderTranslations(w){
+  const opts = buildRuOptionsOnly(w); const els=[]; const seen=new Set();
+  opts.forEach(o=>{ const key=(o.type+'|'+o.text).toLowerCase(); if(seen.has(key)) return; seen.add(key);
     const d=document.createElement('div'); d.className='opt float'; d.dataset.type=o.type; d.textContent=o.text; cloud.appendChild(d); els.push(d);
-    d.onclick=()=>{
-      if(locked) return;
-      if(o.type==='form'){
-        if(formDone) return;
-        const ok = (o.text.toLowerCase()===w.plural.toLowerCase());
-        animateChoice(d,ok);
-        if(ok){ formDone=true; keepOnlyType('form', d); maybeNext(); }
-        else{ stageHadError=true; totalCount++; updateHUD(); const keyRule = w.rule; setLocked(true,10,keyRule || 'addS'); }
-      } else { // ru
-        if(ruDone) return;
-        const ok = (o.text===w.ru);
-        animateChoice(d,ok);
-        if(ok){ ruDone=true; keepOnlyType('ru', d); maybeNext(); }
-        else{ stageHadError=true; totalCount++; updateHUD(); setLocked(true,10,'translation'); }
-      }
+    d.onclick=()=>{ if(locked||ruDone) return; const ok=(o.text===w[RU]); animateChoice(d,ok);
+      if(ok){ if(!ruErr) points += 2; ruDone=true; keepOnlyType('ru', d); renderForms(w); }
+      else { ruErr=true; stageHadError=true; totalCount++; updateHUD(); recordError('translation', w[S]); setLocked(true,10,'translation'); }
     };
   });
   requestAnimationFrame(()=>layoutOptions(cloud,els));
+}
+function renderForms(w){
+  if(formDone) return;
+  const opts = buildFormOptionsOnly(w); const els=[]; const seen=new Set();
+  opts.forEach(o=>{ const key=(o.type+'|'+o.text).toLowerCase(); if(seen.has(key)) return; seen.add(key);
+    const d=document.createElement('div'); d.className='opt float'; d.dataset.type=o.type; d.textContent=o.text; cloud.appendChild(d); els.push(d);
+    d.onclick=()=>{ if(locked||formDone) return; const ok=(o.text.toLowerCase()===w[P].toLowerCase()); animateChoice(d,ok);
+      if(ok){ if(!formErr) points += 1; formDone=true; keepOnlyType('form', d); practicePronunciation(w); }
+      else { formErr=true; stageHadError=true; totalCount++; updateHUD(); const keyRule=w[R]||'addS'; recordError(keyRule, w[S]); setLocked(true,10,keyRule); }
+    };
+  });
+  requestAnimationFrame(()=>layoutOptions(cloud,els));
+}
+
+function spawn(){
+  // header/status per mode
+  cloud.innerHTML = '';
+  if(includeTranslations){
+    cloud.innerHTML = '<div class="badge">Find: translation → plural</div><div class="status"><div class="s" id="sRu">ru</div><div class="s" id="sForm">plural</div></div>';
+  } else {
+    cloud.innerHTML = '<div class="badge">Find: plural</div><div class="status"><div class="s" id="sForm">plural</div></div>';
+  }
+  sRu=ge('sRu'); sForm=ge('sForm');
+  formDone=false; ruDone=!includeTranslations; stageHadError=false; formErr=false; ruErr=false;
+  const w=questions[round]; currentWord = w[S];
+  if(includeTranslations){ renderTranslations(w); tip.textContent='Pick the correct translation first.'; dir.textContent='Step 1: choose translation → Step 2: choose plural'; }
+  else { renderForms(w); tip.textContent='Pick the correct plural form.'; dir.textContent='Choose plural'; }
   stageStart = performance.now();
-  // Auto-play the next word and switch button label to "Repeat"
   autoSpeakNext();
 }
 
-function maybeNext(){
+function maybeNext(delayMs=700){
   if(formDone && ruDone){
-    const took = (performance.now() - stageStart) / 1000;
-    stageTimes.push(took);
+    const took = (performance.now() - stageStart) / 1000; stageTimes.push(took);
     if(!stageHadError){ correctCount++; }
     updateHUD();
     tip.className='msg good'; tip.textContent=`Stage solved. ${stageHadError? 'Error made → no credit.' : 'Perfect! +1'} · Time: ${took.toFixed(2)}s · Avg: ${avgTime().toFixed(2)}s`;
-    setTimeout(()=>{
-      round++;
-      if(round>=questions.length){
-        tip.className='msg good';
-        tip.textContent=`Done! Score: ${correctCount}/${totalCount} · Avg time: ${avgTime().toFixed(2)}s`;
-        return;
-      }
-      updateHUD();
-      spawn();
-    }, 700);
+    setTimeout(()=>{ round++; if(round>=questions.length){ showFinal(); return; } updateHUD(); spawn(); }, 700);
   }
 }
 
 function avgTime(){ if(stageTimes.length===0) return 0; return stageTimes.reduce((a,b)=>a+b,0)/stageTimes.length; }
-function updateHUD(){ document.getElementById('round').textContent=(round+1)+'/60'; document.getElementById('avg').textContent = stageTimes.length? `Avg: ${avgTime().toFixed(2)}s` : 'Avg: —'; document.getElementById('score').textContent = `${correctCount}/${totalCount}`; }
-const sampleSize = 60;
-function seedQuestions(){ questions = shuffle(WORDS.slice()).slice(0,sampleSize); }
+function updateHUD(){ ge('round').textContent=(Math.min(round+1, sampleSize))+'/'+sampleSize; ge('avg').textContent = stageTimes.length? `Avg: ${avgTime().toFixed(2)}s` : 'Avg: —'; ge('score').textContent = `${correctCount}/${totalCount}`; }
 
-autoRestart();
-function autoRestart(){ correctCount=0; totalCount=sampleSize; round=0; stageTimes.length=0; seedQuestions(); updateHUD(); spawn(); }
+function seedQuestions(){
+  // Stratified sampling: ensure at least one word from every rule group present in WORDS
+  const byRule = WORDS.reduce((acc,w)=>{ (acc[w[R]] ||= []).push(w); return acc; }, {});
+  const rules = Object.keys(byRule);
+  // 1) mandatory: one random from each rule
+  const picks = [];
+  rules.forEach(rule=>{ const arr = byRule[rule]; picks.push(arr[Math.floor(Math.random()*arr.length)]); });
+  // 2) fill the rest randomly from remaining pool
+  const taken = new Set(picks);
+  const restPool = WORDS.filter(w=>!taken.has(w));
+  shuffle(restPool);
+  const need = Math.max(0, sampleSize - picks.length);
+  const more = restPool.slice(0, need);
+  questions = shuffle([...picks, ...more]).slice(0, sampleSize);
+}
 
-document.getElementById('restart').onclick=()=>{ if(locked) return; autoRestart(); };
+function beginGame(){ correctCount=0; totalCount=sampleSize; round=0; stageTimes.length=0; points=0; errorStats.clear(); seedQuestions(); updateHUD(); startOverlay.style.display='none'; playBtn.textContent='Repeat'; spawn(); }
+
+// Helpers to reflect selected count before starting
+function getSelectedCount(){ const el = countRow.querySelector('.chip[aria-pressed="true"]'); return el? parseInt(el.dataset.n,10) : 10; }
+function setIdleRoundPill(){ ge('round').textContent = '0/'+getSelectedCount(); }
+setIdleRoundPill();
+
+// ----- Start screen interactions -----
+countRow.addEventListener('click',(e)=>{
+  const b=e.target.closest('button.chip'); if(!b) return; [...countRow.querySelectorAll('.chip')].forEach(x=>x.setAttribute('aria-pressed','false')); b.setAttribute('aria-pressed','true'); sampleSize=parseInt(b.dataset.n,10)||10; setIdleRoundPill();
+});
+
+// Show saved results from start screen
+viewResultsLink.addEventListener('click',()=>{
+  startOverlay.style.display='flex';
+  startPanel.innerHTML = `
+    ${renderResultsPanel()}
+    <div class="row" style="margin-top:8px">
+      <button class="start-btn" id="startBtn">Start</button>
+    </div>`;
+  // re-bind start button after replacing panel content
+  ge('startBtn').addEventListener('click', startClick);
+});
+
+// Start button with 3→1 countdown
+function startClick(){
+  includeTranslations = !!toggleRu.checked;
+  sampleSize = getSelectedCount();
+  if(includeTranslations){ badge.textContent='Find: translation → plural'; dir.textContent='Step 1: choose translation → Step 2: choose plural'; tip.textContent='Pick the correct translation first.'; }
+  else { badge.textContent='Find: plural'; dir.textContent='Choose plural'; tip.textContent='Pick the correct plural form.'; }
+  let n=3; const btn=ge('startBtn'); btn.textContent=n; btn.disabled=true; const iv=setInterval(()=>{ n--; btn.textContent=n>0? n : '…'; if(n<=0){ clearInterval(iv); beginGame(); } }, 700);
+}
+startBtn.addEventListener('click', startClick);
+
+ge('restart').onclick=()=>{ if(locked) return; startOverlay.style.display='flex'; const panelHTML = `
+  <div class="row" id="countRow" aria-label="Word count">
+    <button class="chip" data-n="10" aria-pressed="true">10</button>
+    <button class="chip" data-n="20">20</button>
+    <button class="chip" data-n="35">35</button>
+    <button class="chip" data-n="50">50</button>
+  </div>
+  <label class="toggle"><input type="checkbox" id="toggleRu" checked /> Include translations (RU)</label>
+  <div class="row"><span class="link" id="viewResultsLink">View results</span></div>
+  <button class="start-btn" id="startBtn">Start</button>`;
+  startPanel.innerHTML = panelHTML;
+  // rebind
+  window.location.reload();
+};
 
 // ---- TTS (Web Speech API) ----
-function pickVoice(){
-  const voices = window.speechSynthesis ? speechSynthesis.getVoices() : [];
-  if(!voices || !voices.length) return null;
-  const preferred = voices.find(v=>/^en\-US/i.test(v.lang)) || voices.find(v=>/^en\-GB/i.test(v.lang));
-  return preferred || voices.find(v=>/^en/i.test(v.lang)) || voices[0];
+function pickVoice(){ const voices = window.speechSynthesis ? speechSynthesis.getVoices() : []; if(!voices || !voices.length) return null; const preferred = voices.find(v=>/^en\-US/i.test(v.lang)) || voices.find(v=>/^en\-GB/i.test(v.lang)); return preferred || voices.find(v=>/^en/i.test(v.lang)) || voices[0]; }
+function updateVoice(){ ttsVoice = pickVoice(); playBtn.disabled = !ttsVoice; playBtn.textContent = ttsVoice? 'Repeat' : 'No audio'; }
+function speakCurrent(){ if(!('speechSynthesis' in window)) return; if(!ttsVoice) updateVoice(); if(!ttsVoice || !currentWord) return; const u = new SpeechSynthesisUtterance(currentWord); u.voice = ttsVoice; u.lang = ttsVoice.lang || 'en-US'; speechSynthesis.cancel(); speechSynthesis.speak(u); playBtn.textContent = 'Repeat'; }
+function speakText(txt){ if(!('speechSynthesis' in window)) return; if(!ttsVoice) updateVoice(); if(!ttsVoice || !txt) return; const u=new SpeechSynthesisUtterance(txt); u.voice=ttsVoice; u.lang=ttsVoice.lang||'en-US'; speechSynthesis.cancel(); speechSynthesis.speak(u); }
+function autoSpeakNext(){ if(!('speechSynthesis' in window)) return; if(!ttsVoice){ updateVoice(); if(!ttsVoice){ const once = ()=>{ speechSynthesis.onvoiceschanged = null; updateVoice(); if(ttsVoice) speakCurrent(); }; speechSynthesis.onvoiceschanged = once; return; } } setTimeout(speakCurrent, 50); }
+if('speechSynthesis' in window){ speechSynthesis.onvoiceschanged = updateVoice; updateVoice(); playBtn.addEventListener('click',()=>{ speakCurrent(); }); } else { playBtn.disabled = true; playBtn.textContent = 'No audio'; }
+
+// After correct plural: play plural, wait 500ms, then continue
+function practicePronunciation(w){ speakText(w[P]); setTimeout(()=>{ maybeNext(0); }, 500); }
+
+// ---- Final screen ----
+function showFinal(){
+  const multiplier = sampleSize/6; // 1/6 * N
+  const scaled = Math.floor(points * multiplier);
+  const entries = Array.from(errorStats.entries()).sort((a,b)=>b[1].count - a[1].count);
+  let rows = entries.filter(([_,v])=>v.count>0).map(([rule,v])=>{
+    const ex = v.words && v.words.length? ` (${v.words.slice(0,2).join(', ')})` : '';
+    return `<tr><td>${rule}</td><td style=\"text-align:right\">${v.count}</td><td>${ex}</td></tr>`;
+  }).join('');
+  if(!rows) rows = `<tr><td colspan=\"3\" style=\"text-align:center;color:#aab0d6\">No errors 🎉</td></tr>`;
+  const rawMax = sampleSize*3; // 2 (ru) + 1 (form)
+
+  // Save to local DB
+  saveResult({
+    ts: Date.now(),
+    words: sampleSize,
+    raw: points,
+    rawMax,
+    mult: +multiplier.toFixed(2),
+    final: scaled,
+    correct: correctCount,
+    total: totalCount,
+    mode: includeTranslations? 'Translation+Plural' : 'Plural only',
+    avg: +avgTime().toFixed(2)
+  });
+
+  startOverlay.style.display='flex';
+  startOverlay.querySelector('.start-panel').innerHTML = `
+    <div class=\"pill\">Words: ${sampleSize}</div>
+    <h2 style=\"margin:6px 0 0 0; font-size:24px\">Result</h2>
+    <div style=\"display:flex; gap:8px; flex-wrap:wrap; justify-content:center\">
+      <div class=\"pill\">Raw points: <b>${points}</b> / ${rawMax}</div>
+      <div class=\"pill\">Multiplier: × ${multiplier.toFixed(2)}</div>
+      <div class=\"pill\">Final score: <b>${scaled}</b></div>
+      <div class=\"pill\">Avg time: ${avgTime().toFixed(2)}s</div>
+    </div>
+    <div style=\"max-height:40vh; overflow:auto; width:min(680px, 92vw); background:#0e1328; border:1px solid #27305a; border-radius:12px; padding:8px; margin-top:8px\">
+      <table style=\"width:100%; border-collapse:collapse; font-size:14px\">
+        <thead><tr><th style=\"text-align:left;padding:6px\">Rule</th><th style=\"text-align:right;padding:6px\">Errors</th><th style=\"text-align:left;padding:6px\">Examples</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div class=\"row\" style=\"margin-top:8px\">
+      <button class=\"chip\" id=\"againBtn\">Again</button>
+      <button class=\"chip\" id=\"seeResultsBtn\">See saved results</button>
+    </div>`;
+  const againBtn = ge('againBtn');
+  const seeBtn = ge('seeResultsBtn');
+  againBtn.addEventListener('click', ()=>{ startBtn.disabled=false; startBtn.textContent='Start'; setIdleRoundPill(); startOverlay.querySelector('.start-panel').innerHTML = `
+        <div class=\"row\" id=\"countRow\" aria-label=\"Word count\">
+          <button class=\"chip\" data-n=\"10\" aria-pressed=\"true\">10<\/button>
+          <button class=\"chip\" data-n=\"20\">20<\/button>
+          <button class=\"chip\" data-n=\"35\">35<\/button>
+          <button class=\"chip\" data-n=\"50\">50<\/button>
+        <\/div>
+        <label class=\"toggle\"><input type=\"checkbox\" id=\"toggleRu\" checked \/> Include translations (RU)<\/label>
+        <div class=\"row\"><span class=\"link\" id=\"viewResultsLink\">View results<\/span><\/div>
+        <button class=\"start-btn\" id=\"startBtn\">Start<\/button>`;
+    window.location.reload();
+  });
+  seeBtn.addEventListener('click',()=>{
+    const panel = startOverlay.querySelector('.start-panel');
+    panel.innerHTML = renderResultsPanel()+`<div class=\"row\" style=\"margin-top:8px\"><button class=\"start-btn\" id=\"startBtn\">Start<\/button><\/div>`;
+    ge('startBtn').addEventListener('click', startClick);
+  });
 }
-function updateVoice(){ ttsVoice = pickVoice(); playBtn.disabled = !ttsVoice; playBtn.textContent = ttsVoice? (playBtn.textContent==='Repeat'?'Repeat':'▶ Play') : 'No audio'; }
-function speakCurrent(){
-  if(!('speechSynthesis' in window)) return;
-  if(!ttsVoice) updateVoice();
-  if(!ttsVoice || !currentWord) return;
-  const u = new SpeechSynthesisUtterance(currentWord);
-  u.voice = ttsVoice; u.lang = ttsVoice.lang || 'en-US';
-  speechSynthesis.cancel();
-  speechSynthesis.speak(u);
-  playBtn.textContent = 'Repeat';
-}
-function autoSpeakNext(){
-  if(!('speechSynthesis' in window)) return;
-  if(!ttsVoice){
-    updateVoice();
-    if(!ttsVoice){
-      const once = ()=>{ speechSynthesis.onvoiceschanged = null; updateVoice(); if(ttsVoice) speakCurrent(); };
-      speechSynthesis.onvoiceschanged = once;
-      return;
-    }
-  }
-  setTimeout(speakCurrent, 50);
-}
-if('speechSynthesis' in window){
-  speechSynthesis.onvoiceschanged = updateVoice;
-  updateVoice();
-  playBtn.addEventListener('click',()=>{ speakCurrent(); });
-} else {
-  playBtn.disabled = true; playBtn.textContent = 'No audio';
-}
-
-// ---------------- Lightweight Tests (console) ----------------
-(function runTests(){
-  const get = (sg)=>WORDS.find(w=>w.singular===sg);
-  console.assert(get('city').plural==='cities' && get('city').rule==='yToIes','city test');
-  console.assert(get('wife').plural==='wives' && get('wife').rule==='fToVes','wife test');
-  console.assert(get('bus').plural==='buses' && get('bus').rule==='sibilantEs','bus test');
-  console.assert(get('tomato').plural==='tomatoes' && get('tomato').rule==='oEs','tomato test');
-  console.assert(get('fish').plural==='fish' && get('fish').rule==='invariant','fish test');
-  console.assert(get('man').plural==='men' && get('man').rule==='irregular','man test');
-  console.assert(document.getElementById('playBtn'), 'play button exists');
-
-  // Singular presence and de-dup on invariant
-  const c = get('city');
-  const combinedCity = buildCombinedOptions(c);
-  const formCity = combinedCity.filter(x=>x.type==='form').map(x=>x.text);
-  console.assert(formCity.includes('city') && formCity.includes('cities'),'city & cities present in options');
-  const f = get('fish');
-  const combinedFish = buildCombinedOptions(f);
-  const fishCount = combinedFish.filter(x=>x.type==='form' && x.text==='fish').length;
-  console.assert(fishCount===1,'fish present exactly once in forms');
-
-  // RU options count
-  const w = get('book');
-  const combined = buildCombinedOptions(w);
-  const ruCount = combined.filter(x=>x.type==='ru').length;
-  console.assert(ruCount===4,'ru count = 4');
-  const formOptsOnly = combined.filter(x=>x.type==='form').map(x=>x.text.toLowerCase());
-  const allowed = new Set([w.singular.toLowerCase(), w.plural.toLowerCase(), ...makeWrongForms(w).map(s=>s.toLowerCase())]);
-  console.assert(formOptsOnly.every(t=>allowed.has(t)),'form options only from current word forms');
-  console.assert(combined.some(x=>x.type==='form' && x.text==='books'),'combined has correct plural');
-  console.assert(combined.some(x=>x.type==='ru' && x.text===w.ru),'combined has correct ru');
-
-  // Score model tests (pure simulation)
-  (function scoreModelTest(){
-    function simulate(stageErrors){
-      let correct=0, total=60; // baseline
-      for(const errs of stageErrors){ if(errs>0){ total += errs; } else { correct++; } }
-      return {correct,total};
-    }
-    const a = simulate([2]); // two wrongs then solve ⇒ no credit
-    console.assert(a.correct===0 && a.total===62,'score model: 2 errors => 0/62');
-    const b = simulate([0,0,1,0]); // two perfect, one with 1 error, one perfect
-    console.assert(b.correct===3 && b.total===61,'score model mix');
-  })();
-
-  // TTS: currentWord set and ttsVoice variable exists
-  console.assert(typeof currentWord === 'string' && currentWord.length>0, 'currentWord is initialized');
-  console.assert(typeof ttsVoice !== 'undefined', 'ttsVoice defined');
-})();
 </script>
 </body>
 </html>
