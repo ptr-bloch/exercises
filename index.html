@@ -474,7 +474,17 @@ function renderTranslations(w){
     const d=document.createElement('div'); d.className='opt float'; d.dataset.type=o.type; d.textContent=o.text; cloud.appendChild(d); els.push(d);
     d.onclick=()=>{ if(locked||ruDone) return; const ok=(o.text===w[RU]); animateChoice(d,ok);
       if(ok){ if(!ruErr) points += 2; ruDone=true; keepOnlyType('ru', d); renderForms(w); }
-      else { ruErr=true; stageHadError=true; totalCount++; updateHUD(); recordError('translation', w[S]); setLocked(true,5,'translation'); }
+      else { ruErr=true; stageHadError=true; totalCount++; updateHUD(); recordError('translation', w[S]);
+        // remove 3 wrong translations; must include the clicked wrong option
+        const ruNodes = Array.from(cloud.querySelectorAll('.opt')).filter(el=>el.dataset.type==='ru');
+        const wrongs = ruNodes.filter(el=>el.textContent !== w[RU]);
+        const others = wrongs.filter(el=>el!==d);
+        shuffle(others);
+        const toRemove = [d, ...others.slice(0,2)].filter(Boolean);
+        toRemove.forEach(el=>el.remove());
+        const remainingRu = Array.from(cloud.querySelectorAll('.opt')).filter(el=>el.dataset.type==='ru');
+        requestAnimationFrame(()=>layoutOptions(cloud, remainingRu));
+        setLocked(true,5,'translation'); }
     };
   });
   requestAnimationFrame(()=>layoutOptions(cloud,els));
