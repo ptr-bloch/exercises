@@ -197,7 +197,7 @@ const WORDS = [
   ['swine','swine','invariant','свинья'],
   ['moose','moose','invariant','лось'],
   ['bison','bison','invariant','бизон'],
-  ['offspring','offspring','offspring','потомство'],
+  ['offspring','offspring','invariant','потомство'],
   ['ice','ice','invariant','лёд'],
   // Regular addS (sample)
   ['book','books','addS','книга'],
@@ -450,7 +450,7 @@ function keepOnlyType(type, selected){
 // ---- options builders ----
 function makeWrongForms(w){
   const wrong = new Set(); const correct = w[P].toLowerCase(); const add = (s)=>{ if(s && s.toLowerCase()!==correct) wrong.add(s); };
-  add(w[S]+'s'); add(w[S]+'es'); if(/[^aeiou]y$/i.test(w[S])) add(w[S]+'ys'); if(/(f|fe)$/i.test(w[S])) add(w[S].replace(/fe$/,'fes').replace(/f$/,'fs')); add(w[S]+'x'); add(w[S]+'zz');
+  add(w[S]+'s'); add(w[S]+'es'); if(/[^aeiou]y$/i.test(w[S])) add(w[S]+'ys'); if(/(f|fe)$/i.test(w[S])) add(w[S].replace(/fe$/,'fes').replace(/f$/,'fs')); add(w[S]+'x'); add(w[S]+'iz'); add(w[S]+'is');
   return Array.from(wrong);
 }
 function buildFormOptionsOnly(w){
@@ -474,7 +474,7 @@ function renderTranslations(w){
     const d=document.createElement('div'); d.className='opt float'; d.dataset.type=o.type; d.textContent=o.text; cloud.appendChild(d); els.push(d);
     d.onclick=()=>{ if(locked||ruDone) return; const ok=(o.text===w[RU]); animateChoice(d,ok);
       if(ok){ if(!ruErr) points += 2; ruDone=true; keepOnlyType('ru', d); renderForms(w); }
-      else { ruErr=true; stageHadError=true; totalCount++; updateHUD(); recordError('translation', w[S]); setLocked(true,10,'translation'); }
+      else { ruErr=true; stageHadError=true; totalCount++; updateHUD(); recordError('translation', w[S]); setLocked(true,5,'translation'); }
     };
   });
   requestAnimationFrame(()=>layoutOptions(cloud,els));
@@ -486,7 +486,7 @@ function renderForms(w){
     const d=document.createElement('div'); d.className='opt float'; d.dataset.type=o.type; d.textContent=o.text; cloud.appendChild(d); els.push(d);
     d.onclick=()=>{ if(locked||formDone) return; const ok=(o.text.toLowerCase()===w[P].toLowerCase()); animateChoice(d,ok);
       if(ok){ if(!formErr) points += 1; formDone=true; keepOnlyType('form', d); practicePronunciation(w); }
-      else { formErr=true; stageHadError=true; totalCount++; updateHUD(); const keyRule=w[R]||'addS'; recordError(keyRule, w[S]); setLocked(true,10,keyRule); }
+      else { formErr=true; stageHadError=true; totalCount++; updateHUD(); const keyRule=(RULES[w[R]]?w[R]:(w[S]===w[P]?'invariant':'addS')); recordError(keyRule, w[S]); setLocked(true,5,keyRule); }
     };
   });
   requestAnimationFrame(()=>layoutOptions(cloud,els));
