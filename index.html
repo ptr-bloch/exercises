@@ -63,6 +63,7 @@
   .row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
   .chip{border:1px solid #2b3157;background:#0e1328;color:var(--text);padding:8px 12px;border-radius:999px;cursor:pointer;font-size:14px}
   .chip[aria-pressed="true"]{background:#1a2247;border-color:#3c4b93}
+  .chip[disabled]{opacity:.45;cursor:not-allowed}
   .toggle{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:14px}
   .link{color:var(--accent);cursor:pointer;text-decoration:underline}
 </style>
@@ -90,6 +91,7 @@
           <button class="chip" data-n="20">20</button>
           <button class="chip" data-n="35">35</button>
           <button class="chip" data-n="50">50</button>
+          <button class="chip" data-n="all" id="chipAll">All</button>
         </div>
         <label class="toggle"><input type="checkbox" id="toggleRu" checked /> Include translations (RU)</label>
         <div class="row">
@@ -101,7 +103,7 @@
     <div class="target">
       <div class="small" id="direction">Step 1: choose translation → Step 2: choose plural</div>
       <button class="playbtn" id="playBtn" title="Play pronunciation" aria-label="Play pronunciation">Repeat</button>
-      <div class="msg" id="tip">Pick the correct <b>translation</b> first. Wrong = 10s lock with rule (EN/RU).</div>
+      <div class="msg" id="tip">Pick the correct <b>translation</b> first. Wrong = 5s lock with rule (EN/RU).</div>
       <div>
         <button id="restart">Restart</button>
       </div>
@@ -365,6 +367,17 @@ const WORDS = [
 
 // ---------------- Local "DB" (localStorage) ----------------
 const DB_KEY = 'pluralTrainerResultsV1';
+const ALL_KEY = 'pluralTrainerAllUnlocked';
+function isAllUnlocked(){ return localStorage.getItem(ALL_KEY)==='1'; }
+function setAllChipState(){
+  const btn=ge('chipAll');
+  if(!btn) return;
+  const n=WORDS.length;
+  btn.dataset.n=String(n);
+  btn.textContent=String(n);
+  btn.removeAttribute('disabled');
+  btn.title='Use all words';
+}
 function loadResults(){ try{ return JSON.parse(localStorage.getItem(DB_KEY) || '[]'); }catch(e){ return []; } }
 function saveResult(row){ const all=loadResults(); all.push(row); localStorage.setItem(DB_KEY, JSON.stringify(all)); }
 function formatTS(ts){ const d=new Date(ts); const pad=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`; }
@@ -556,13 +569,18 @@ function seedQuestions(){
 function beginGame(){ correctCount=0; totalCount=sampleSize; round=0; stageTimes.length=0; points=0; errorStats.clear(); seedQuestions(); updateHUD(); startOverlay.style.display='none'; playBtn.textContent='Repeat'; spawn(); }
 
 // Helpers to reflect selected count before starting
-function getSelectedCount(){ const el = countRow.querySelector('.chip[aria-pressed="true"]'); return el? parseInt(el.dataset.n,10) : 10; }
+function getSelectedCount(){ const el = countRow.querySelector('.chip[aria-pressed="true"]'); if(!el) return 10; return parseInt(el.dataset.n,10)||10; }
 function setIdleRoundPill(){ ge('round').textContent = '0/'+getSelectedCount(); }
 setIdleRoundPill();
+setAllChipState();
 
 // ----- Start screen interactions -----
 countRow.addEventListener('click',(e)=>{
-  const b=e.target.closest('button.chip'); if(!b) return; [...countRow.querySelectorAll('.chip')].forEach(x=>x.setAttribute('aria-pressed','false')); b.setAttribute('aria-pressed','true'); sampleSize=parseInt(b.dataset.n,10)||10; setIdleRoundPill();
+  const b=e.target.closest('button.chip'); if(!b || b.hasAttribute('disabled')) return;
+  [...countRow.querySelectorAll('.chip')].forEach(x=>x.setAttribute('aria-pressed','false'));
+  b.setAttribute('aria-pressed','true');
+  sampleSize=parseInt(b.dataset.n,10)||10;
+  setIdleRoundPill();
 });
 
 // Show saved results from start screen
