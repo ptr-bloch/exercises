@@ -115,6 +115,11 @@ const qs = sel => document.querySelector(sel);
 
 // dataset index constants
 const S=0,P=1,R=2,RU=3;
+// Article helpers for singular speech
+const UNCT = new Set(['ice','offspring']);
+function needsArticle(w){ if(!w) return false; const x=w.toLowerCase(); return !UNCT.has(x); }
+function pickArticle(w){ const x=(w||'').toLowerCase(); if(!needsArticle(x)) return ''; if(/^(honest|honor|honour|hour)/.test(x)) return 'an'; if(/^one/.test(x)) return 'a'; if(/^u[bcdfghjklmnpqrstvwxyz]/.test(x)) return 'a'; if(/^[aeiou]/.test(x)) return 'an'; return 'a'; }
+function withArticle(w){ const a=pickArticle(w); return a? a+' '+w : w; }
 
 // ---------------- Rules ----------------
 const RULES = {
@@ -600,7 +605,7 @@ ge('restart').onclick=()=>{ if(locked) return; startOverlay.style.display='flex'
 // ---- TTS (Web Speech API) ----
 function pickVoice(){ const voices = window.speechSynthesis ? speechSynthesis.getVoices() : []; if(!voices || !voices.length) return null; const preferred = voices.find(v=>/^en\-US/i.test(v.lang)) || voices.find(v=>/^en\-GB/i.test(v.lang)); return preferred || voices.find(v=>/^en/i.test(v.lang)) || voices[0]; }
 function updateVoice(){ ttsVoice = pickVoice(); playBtn.disabled = !ttsVoice; playBtn.textContent = ttsVoice? 'Repeat' : 'No audio'; }
-function speakCurrent(){ if(!('speechSynthesis' in window)) return; if(!ttsVoice) updateVoice(); if(!ttsVoice || !currentWord) return; const u = new SpeechSynthesisUtterance(currentWord); u.voice = ttsVoice; u.lang = ttsVoice.lang || 'en-US'; speechSynthesis.cancel(); speechSynthesis.speak(u); playBtn.textContent = 'Repeat'; }
+function speakCurrent(){ if(!('speechSynthesis' in window)) return; if(!ttsVoice) updateVoice(); if(!ttsVoice || !currentWord) return; const u = new SpeechSynthesisUtterance(withArticle(currentWord)); u.voice = ttsVoice; u.lang = ttsVoice.lang || 'en-US'; speechSynthesis.cancel(); speechSynthesis.speak(u); playBtn.textContent = 'Repeat'; }
 function speakText(txt){ if(!('speechSynthesis' in window)) return; if(!ttsVoice) updateVoice(); if(!ttsVoice || !txt) return; const u=new SpeechSynthesisUtterance(txt); u.voice=ttsVoice; u.lang=ttsVoice.lang||'en-US'; speechSynthesis.cancel(); speechSynthesis.speak(u); }
 function autoSpeakNext(){ if(!('speechSynthesis' in window)) return; if(!ttsVoice){ updateVoice(); if(!ttsVoice){ const once = ()=>{ speechSynthesis.onvoiceschanged = null; updateVoice(); if(ttsVoice) speakCurrent(); }; speechSynthesis.onvoiceschanged = once; return; } } setTimeout(speakCurrent, 50); }
 if('speechSynthesis' in window){ speechSynthesis.onvoiceschanged = updateVoice; updateVoice(); playBtn.addEventListener('click',()=>{ speakCurrent(); }); } else { playBtn.disabled = true; playBtn.textContent = 'No audio'; }
