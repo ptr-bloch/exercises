@@ -1,0 +1,710 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Интерактивный путеводитель для подростка по направлениям авиации, беспилотников и инженерии.">
+  <meta name="theme-color" content="#101827">
+  <title>Что в авиации может быть твоим?</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f6f9;
+      --surface: rgba(255,255,255,.92);
+      --surface-strong: #ffffff;
+      --text: #172033;
+      --muted: #637083;
+      --line: #dfe5ee;
+      --accent: #275efe;
+      --accent-dark: #1646d8;
+      --accent-soft: #e9efff;
+      --green: #087f5b;
+      --green-soft: #e5f7f0;
+      --yellow: #9a6700;
+      --yellow-soft: #fff5d6;
+      --red: #b42318;
+      --red-soft: #ffebe9;
+      --shadow: 0 14px 38px rgba(28, 40, 65, .09);
+      --radius: 22px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      background:
+        radial-gradient(circle at 9% -5%, rgba(39,94,254,.13), transparent 28rem),
+        radial-gradient(circle at 92% 8%, rgba(6,148,162,.10), transparent 24rem),
+        var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    a { color: inherit; }
+
+    .shell { width: min(1160px, calc(100% - 32px)); margin: 0 auto; }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: 72px 0 50px;
+      border-bottom: 1px solid rgba(214,222,234,.85);
+    }
+    .hero::after {
+      content: "";
+      position: absolute;
+      right: max(2vw, 18px);
+      top: 34px;
+      width: clamp(180px, 30vw, 420px);
+      aspect-ratio: 1.9;
+      opacity: .12;
+      background: currentColor;
+      clip-path: polygon(0 48%, 34% 43%, 49% 0, 58% 2%, 57% 40%, 94% 31%, 100% 36%, 68% 52%, 91% 74%, 85% 78%, 55% 61%, 49% 100%, 41% 99%, 42% 59%, 12% 66%);
+      transform: rotate(-7deg);
+      pointer-events: none;
+    }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 18px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent-dark);
+      font-weight: 750;
+      font-size: .82rem;
+      letter-spacing: .045em;
+      text-transform: uppercase;
+    }
+    h1 {
+      max-width: 790px;
+      margin: 0;
+      font-size: clamp(2.3rem, 6vw, 5.4rem);
+      line-height: .98;
+      letter-spacing: -.055em;
+    }
+    .hero p {
+      max-width: 720px;
+      margin: 24px 0 0;
+      color: var(--muted);
+      font-size: clamp(1rem, 2vw, 1.22rem);
+    }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+    .primary, .secondary, .ghost {
+      min-height: 46px;
+      border-radius: 13px;
+      padding: 11px 17px;
+      border: 1px solid transparent;
+      font-weight: 760;
+    }
+    .primary { color: white; background: var(--accent); box-shadow: 0 8px 22px rgba(39,94,254,.22); }
+    .primary:hover { background: var(--accent-dark); }
+    .secondary { background: var(--surface-strong); border-color: var(--line); color: var(--text); }
+    .secondary:hover { border-color: #bcc7d7; }
+    .ghost { background: transparent; border-color: var(--line); color: var(--muted); }
+    .ghost:hover { color: var(--text); background: #fff; }
+
+    .intro-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      padding: 30px 0 8px;
+    }
+    .intro-card {
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--surface);
+      box-shadow: 0 8px 24px rgba(32,45,72,.04);
+    }
+    .intro-card strong { display: block; margin-bottom: 5px; font-size: 1.04rem; }
+    .intro-card span { color: var(--muted); font-size: .94rem; }
+
+    .toolbar-wrap {
+      position: sticky;
+      z-index: 20;
+      top: 0;
+      margin-top: 28px;
+      padding: 10px 0;
+      background: rgba(244,246,249,.88);
+      backdrop-filter: blur(14px);
+    }
+    .toolbar {
+      display: grid;
+      grid-template-columns: minmax(180px, 1fr) auto;
+      gap: 12px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255,255,255,.9);
+      box-shadow: 0 10px 32px rgba(32,45,72,.06);
+    }
+    .search {
+      width: 100%;
+      min-height: 44px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 0 14px;
+      background: #fff;
+      color: var(--text);
+      outline: none;
+    }
+    .search:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(39,94,254,.12); }
+    .filter-row { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
+    .chip {
+      min-height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 8px 12px;
+      background: #fff;
+      color: var(--muted);
+      font-weight: 700;
+      font-size: .88rem;
+    }
+    .chip:hover, .chip.active { color: var(--accent-dark); border-color: #b8c8ff; background: var(--accent-soft); }
+
+    main { padding-bottom: 70px; }
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 20px;
+      margin: 48px 0 19px;
+    }
+    .section-head h2 { margin: 0; font-size: clamp(1.65rem, 3vw, 2.45rem); letter-spacing: -.035em; }
+    .section-head p { max-width: 520px; margin: 0; color: var(--muted); }
+
+    .cards { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; }
+    .card {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface-strong);
+      box-shadow: 0 9px 28px rgba(32,45,72,.05);
+      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    }
+    .card:hover { transform: translateY(-2px); box-shadow: var(--shadow); border-color: #cbd5e4; }
+    .card.hidden { display: none; }
+    .card-head {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 48px 1fr auto;
+      align-items: start;
+      gap: 14px;
+      border: 0;
+      padding: 21px;
+      text-align: left;
+      background: transparent;
+      color: inherit;
+    }
+    .index {
+      display: grid;
+      place-items: center;
+      width: 48px;
+      height: 48px;
+      border-radius: 15px;
+      background: var(--accent-soft);
+      color: var(--accent-dark);
+      font-weight: 850;
+      letter-spacing: -.03em;
+    }
+    .card h3 { margin: 1px 0 5px; font-size: 1.25rem; letter-spacing: -.025em; }
+    .card-summary { margin: 0; color: var(--muted); font-size: .94rem; }
+    .chevron { margin-top: 9px; color: #8792a5; transition: transform .2s ease; }
+    .card.open .chevron { transform: rotate(180deg); }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+    .tag { padding: 4px 8px; border-radius: 999px; background: #f1f4f8; color: #556276; font-size: .76rem; font-weight: 720; }
+
+    .card-body { display: none; border-top: 1px solid var(--line); padding: 0 21px 22px; }
+    .card.open .card-body { display: block; }
+    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding-top: 20px; }
+    .detail { padding: 16px; border-radius: 15px; background: #f7f9fc; }
+    .detail h4 { margin: 0 0 8px; font-size: .82rem; text-transform: uppercase; letter-spacing: .045em; color: #59667a; }
+    .detail p, .detail ul { margin: 0; font-size: .93rem; }
+    .detail ul { padding-left: 18px; }
+    .detail li + li { margin-top: 5px; }
+    .trial { grid-column: 1 / -1; border: 1px dashed #b9c5d7; background: #fff; }
+    .trial strong { color: var(--accent-dark); }
+
+    .rating {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 17px;
+    }
+    .rating button {
+      min-height: 44px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+      color: var(--muted);
+      font-weight: 750;
+    }
+    .rating button:hover { border-color: #aebacf; color: var(--text); }
+    .rating button[data-value="yes"].selected { background: var(--green-soft); border-color: #99dbc5; color: var(--green); }
+    .rating button[data-value="maybe"].selected { background: var(--yellow-soft); border-color: #eed48f; color: var(--yellow); }
+    .rating button[data-value="no"].selected { background: var(--red-soft); border-color: #f3bbb5; color: var(--red); }
+
+    .results {
+      margin-top: 54px;
+      padding: 28px;
+      border-radius: 26px;
+      background: #101827;
+      color: #f8fbff;
+      box-shadow: 0 20px 48px rgba(20,29,47,.18);
+    }
+    .results-head { display: flex; justify-content: space-between; align-items: start; gap: 20px; }
+    .results h2 { margin: 0; font-size: clamp(1.65rem, 3vw, 2.35rem); letter-spacing: -.035em; }
+    .results .lead { max-width: 650px; margin: 8px 0 0; color: #aebbd0; }
+    .progress { margin-top: 20px; }
+    .progress-label { display: flex; justify-content: space-between; margin-bottom: 7px; color: #c2ccdc; font-size: .88rem; }
+    .progress-track { overflow: hidden; height: 9px; border-radius: 999px; background: #26334a; }
+    .progress-value { width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#6e92ff,#65d7c8); transition: width .2s ease; }
+    .result-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; margin-top: 22px; }
+    .result-panel { padding: 19px; border: 1px solid #30405a; border-radius: 18px; background: #172338; }
+    .result-panel h3 { margin: 0 0 11px; font-size: 1rem; }
+    .selected-list { display: flex; flex-wrap: wrap; gap: 8px; min-height: 32px; }
+    .result-pill { padding: 7px 10px; border-radius: 999px; background: #263b60; color: #e9f0ff; font-size: .88rem; font-weight: 700; }
+    .empty { color: #91a0b7; }
+    .result-copy { margin: 0; color: #c6d0df; font-size: .94rem; }
+    .result-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 18px; }
+    .results .secondary { background: #fff; }
+    .results .ghost { border-color: #43516a; color: #b9c5d8; }
+    .results .ghost:hover { background: #1e2c44; color: white; }
+
+    .footer { padding: 24px 0 45px; color: var(--muted); font-size: .9rem; }
+    .footer p { margin: 0; }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 22px;
+      z-index: 50;
+      transform: translate(-50%, 20px);
+      opacity: 0;
+      pointer-events: none;
+      padding: 10px 14px;
+      border-radius: 12px;
+      background: #101827;
+      color: white;
+      box-shadow: var(--shadow);
+      transition: .2s ease;
+    }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+    @media (max-width: 900px) {
+      .intro-grid { grid-template-columns: 1fr; }
+      .toolbar { grid-template-columns: 1fr; }
+      .filter-row { justify-content: flex-start; }
+      .cards { grid-template-columns: 1fr; }
+      .result-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 620px) {
+      .shell { width: min(100% - 20px, 1160px); }
+      .hero { padding-top: 50px; }
+      .hero::after { opacity: .065; top: 70px; }
+      .section-head, .results-head { display: block; }
+      .section-head p { margin-top: 8px; }
+      .detail-grid { grid-template-columns: 1fr; }
+      .trial { grid-column: auto; }
+      .rating { grid-template-columns: 1fr; }
+      .card-head { grid-template-columns: 42px 1fr auto; padding: 17px; }
+      .index { width: 42px; height: 42px; }
+      .results { padding: 21px 17px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="shell">
+      <div class="eyebrow">Путеводитель для 13 лет</div>
+      <h1>Что в авиации может быть твоим?</h1>
+      <p>Это не тест на профессию. Здесь можно спокойно посмотреть, чем занимаются разные инженеры, отметить собственную реакцию и выбрать несколько маленьких проб.</p>
+      <div class="hero-actions">
+        <a class="primary" href="#directions">Смотреть направления</a>
+        <a class="secondary" href="#results">Перейти к результатам</a>
+      </div>
+      <div class="intro-grid" aria-label="Как пользоваться сайтом">
+        <div class="intro-card"><strong>Читайте по одной карточке</strong><span>Не нужно проходить всё за раз. Двух-трёх направлений за вечер достаточно.</span></div>
+        <div class="intro-card"><strong>Оценивайте процесс</strong><span>Не «красивая ли профессия», а хотелось бы заниматься такими задачами самой.</span></div>
+        <div class="intro-card"><strong>Проверяйте мини-пробой</strong><span>Интерес лучше выясняется в небольшом деле, а не по одному описанию.</span></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="shell">
+    <div class="toolbar-wrap" aria-label="Фильтры направлений">
+      <div class="toolbar">
+        <input class="search" id="search" type="search" placeholder="Найти: программирование, 3D, эксперименты…" aria-label="Поиск по направлениям">
+        <div class="filter-row" id="filters"></div>
+      </div>
+    </div>
+
+    <section id="directions">
+      <div class="section-head">
+        <h2>Направления</h2>
+        <p>Открывайте карточки, смотрите на типичные задачи и отмечайте первое честное впечатление.</p>
+      </div>
+      <div class="cards" id="cards"></div>
+    </section>
+
+    <section class="results" id="results" aria-live="polite">
+      <div class="results-head">
+        <div>
+          <h2>Моя карта интересов</h2>
+          <p class="lead">Результат не выбирает профессию. Он лишь показывает, какие виды занятий стоит попробовать на практике первыми.</p>
+        </div>
+      </div>
+      <div class="progress">
+        <div class="progress-label"><span>Отмечено направлений</span><strong id="progressText">0 из 14</strong></div>
+        <div class="progress-track"><div class="progress-value" id="progressValue"></div></div>
+      </div>
+      <div class="result-grid">
+        <div class="result-panel">
+          <h3>Хочется попробовать</h3>
+          <div class="selected-list" id="yesList"><span class="empty">Пока ничего не отмечено.</span></div>
+        </div>
+        <div class="result-panel">
+          <h3>Что это может означать</h3>
+          <p class="result-copy" id="interpretation">Начните с чтения нескольких карточек. Отмечать можно постепенно — выбор сохранится в этом браузере.</p>
+        </div>
+      </div>
+      <div class="result-actions">
+        <button class="secondary" id="copyResult" type="button">Скопировать результат</button>
+        <button class="ghost" id="resetResult" type="button">Сбросить отметки</button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer shell">
+    <p>Главный вопрос: «Какие задачи мне хочется попробовать ещё раз?» Сложно — не всегда значит неинтересно.</p>
+  </footer>
+  <div class="toast" id="toast" role="status"></div>
+
+  <script>
+    const directions = [
+      {
+        id: "aero",
+        title: "Аэродинамика",
+        summary: "Как форма крыла и поток воздуха влияют на полёт.",
+        tags: ["исследования", "физика", "эксперименты", "3D"],
+        filters: ["Исследовать", "Моделировать", "Анализировать"],
+        do: "Создают модели крыльев и самолётов, рассчитывают подъёмную силу и сопротивление, изучают давление, вихри и срыв потока.",
+        task: "Изменить длину или изгиб крыла и выяснить, станет ли самолёт лучше планировать.",
+        like: ["искать ответ на вопрос «почему?»", "наблюдать невидимые процессы через визуализации", "проводить много сравнительных опытов"],
+        tire: "Часть работы — терпеливо настраивать расчёт, проверять данные и разбираться в графиках.",
+        trial: "Сделать три бумажных планера, меняя только один параметр, и записать дальность полёта."
+      },
+      {
+        id: "flight-dynamics",
+        title: "Динамика полёта и устойчивость",
+        summary: "Почему самолёт поворачивается, раскачивается или возвращается в ровный полёт.",
+        tags: ["движение", "симуляторы", "устойчивость", "графики"],
+        filters: ["Исследовать", "Моделировать", "Анализировать"],
+        do: "Изучают движение самолёта по крену, тангажу и рысканию, влияние центра тяжести и собственные колебания аппарата.",
+        task: "Понять, почему после отклонения руля самолёт начал всё сильнее раскачиваться.",
+        like: ["разбираться в движении", "наблюдать причинно-следственные связи", "работать с симуляторами"],
+        tire: "Позже появляется много координат, графиков и математики, хотя начинать можно без формул.",
+        trial: "В авиасимуляторе изменить положение центра тяжести или чувствительность управления и сравнить поведение."
+      },
+      {
+        id: "construction",
+        title: "Конструкция и 3D-проектирование",
+        summary: "Как устроить самолёт и превратить идею в точные детали.",
+        tags: ["CAD", "3D", "механизмы", "сборка"],
+        filters: ["Конструировать", "Собирать", "Моделировать"],
+        do: "Проектируют крыло, фюзеляж, хвост, шасси, крепления и подвижные механизмы. Следят, чтобы всё собиралось и помещалось.",
+        task: "Спроектировать крепление камеры, которое будет лёгким, прочным и не закроет обзор.",
+        like: ["собирать конструкторы", "представлять предметы в объёме", "делать аккуратные чертежи и модели"],
+        tire: "Нужно внимательно следить за размерами, ограничениями и многократно исправлять мелкие детали.",
+        trial: "Собрать простой самолёт в Tinkercad или Onshape из крыла, корпуса и хвоста."
+      },
+      {
+        id: "strength",
+        title: "Прочность и материалы",
+        summary: "Как сделать аппарат лёгким, но не хрупким.",
+        tags: ["испытания", "материалы", "нагрузки", "расследования"],
+        filters: ["Исследовать", "Собирать", "Анализировать"],
+        do: "Предсказывают изгиб и разрушение деталей, выбирают материал, проводят испытания и находят слабые места конструкции.",
+        task: "Уменьшить массу крыла, но сохранить способность выдержать резкий манёвр.",
+        like: ["строить прочные конструкции", "выяснять причины поломок", "проводить точные испытания"],
+        tire: "Важны аккуратность, повторяемость опытов и подробные измерения.",
+        trial: "Сделать несколько бумажных балок разного профиля и проверить, какой вариант выдержит больший груз."
+      },
+      {
+        id: "propulsion",
+        title: "Двигатели и энергия",
+        summary: "Откуда берётся тяга и как летать дольше при ограниченной энергии.",
+        tags: ["моторы", "винты", "аккумуляторы", "измерения"],
+        filters: ["Собирать", "Исследовать", "Анализировать"],
+        do: "Подбирают моторы, винты, аккумуляторы и силовую электронику, измеряют тягу и расход энергии.",
+        task: "Найти сочетание винта и мотора, которое поднимет аппарат и не разрядит батарею слишком быстро.",
+        like: ["моторы и движущиеся механизмы", "электрические эксперименты", "поиск эффективного решения"],
+        tire: "Нужно соблюдать безопасность и долго сравнивать близкие по результату варианты.",
+        trial: "На безопасном учебном моторчике сравнить тягу двух бумажных пропеллеров разной формы."
+      },
+      {
+        id: "control",
+        title: "Автопилоты и автоматическое управление",
+        summary: "Как научить аппарат удерживать высоту, курс и спокойное движение.",
+        tags: ["код", "алгоритмы", "PID", "симуляция"],
+        filters: ["Программировать", "Моделировать", "Анализировать"],
+        do: "Пишут алгоритмы, которые сравнивают нужное состояние с реальным и управляют рулями или моторами.",
+        task: "Настроить автопилот так, чтобы он быстро набирал высоту, но не раскачивался вокруг цели.",
+        like: ["видеть, как код превращается в движение", "настраивать поведение", "искать причину нестабильности"],
+        tire: "Один и тот же алгоритм приходится запускать и исправлять много раз; результат не всегда очевиден сразу.",
+        trial: "В простой симуляции настроить коэффициент управления высотой и добиться самого плавного полёта."
+      },
+      {
+        id: "navigation",
+        title: "Навигация и маршруты",
+        summary: "Как понять, где аппарат находится и каким путём ему лететь.",
+        tags: ["карты", "координаты", "маршруты", "головоломки"],
+        filters: ["Программировать", "Планировать", "Анализировать"],
+        do: "Строят маршруты между точками, рассчитывают направление, обходят препятствия и программируют возвращение домой.",
+        task: "Проложить безопасный маршрут через несколько точек с учётом запретных зон и запаса батареи.",
+        like: ["карты и ориентирование", "задачи на поиск пути", "планирование последовательности действий"],
+        tire: "Приходится внимательно работать с координатами и предусматривать множество исключений.",
+        trial: "Нарисовать карту с препятствиями и придумать алгоритм, который проведёт аппарат к цели кратчайшим безопасным путём."
+      },
+      {
+        id: "sensors",
+        title: "Датчики и электроника",
+        summary: "Как аппарат измеряет движение, высоту, скорость и окружающий мир.",
+        tags: ["электроника", "сенсоры", "пайка", "данные"],
+        filters: ["Собирать", "Программировать", "Анализировать"],
+        do: "Подключают гироскопы, акселерометры, GPS, барометры и другие датчики, калибруют их и фильтруют ошибки.",
+        task: "Определить наклон аппарата по шумным показаниям нескольких датчиков.",
+        like: ["работать с настоящими приборами", "соединять код и железо", "искать неисправности"],
+        tire: "Контакты отходят, измерения шумят, а причина ошибки иногда оказывается совсем не там, где ожидалось.",
+        trial: "Считать с телефона данные акселерометра и посмотреть, как меняются графики при поворотах."
+      },
+      {
+        id: "embedded",
+        title: "Бортовое программирование",
+        summary: "Как создать надёжный компьютерный мозг, который работает прямо на аппарате.",
+        tags: ["код", "микроконтроллеры", "надёжность", "логика"],
+        filters: ["Программировать", "Собирать", "Анализировать"],
+        do: "Пишут программы для ограниченных по памяти и мощности компьютеров, обрабатывают события и продумывают аварийные режимы.",
+        task: "Решить, что должен сделать аппарат при потере GPS или низком заряде батареи.",
+        like: ["логические системы", "поиск ошибок в коде", "программирование реальных устройств"],
+        tire: "Много времени уходит на невидимые детали: задержки, память, редкие ошибки и тестирование.",
+        trial: "На micro:bit или Arduino запрограммировать несколько безопасных режимов для воображаемого аппарата."
+      },
+      {
+        id: "vision",
+        title: "Компьютерное зрение и ИИ",
+        summary: "Как научить беспилотник понимать изображение с камеры.",
+        tags: ["ИИ", "камеры", "изображения", "Python"],
+        filters: ["Программировать", "Исследовать", "Анализировать"],
+        do: "Обучают программы находить объекты, посадочные площадки, дороги и препятствия на фотографиях и видео.",
+        task: "Научить камеру замечать посадочную метку при разном освещении и под разными углами.",
+        like: ["изображения и видео", "искусственный интеллект", "быстро видимый результат программы"],
+        tire: "Нужно собирать и размечать данные, а программа иногда уверенно ошибается по неожиданным причинам.",
+        trial: "С помощью готового сервиса обучить распознавание двух предметов и проверить его на новых фотографиях."
+      },
+      {
+        id: "simulation",
+        title: "Физическое моделирование и симуляторы",
+        summary: "Как построить виртуальный самолёт и безопасно проверять идеи.",
+        tags: ["виртуальный мир", "физика", "код", "визуализация"],
+        filters: ["Моделировать", "Программировать", "Исследовать"],
+        do: "Описывают силы, движение, датчики, ветер и окружающую среду так, чтобы виртуальный аппарат был похож на настоящий.",
+        task: "Добавить в модель порыв ветра и проверить, справится ли с ним автопилот.",
+        like: ["создавать виртуальные миры", "соединять физику и программирование", "безопасно ломать и повторять эксперименты"],
+        tire: "Модель никогда не идеальна; приходится решать, какие детали важны, а какие можно упростить.",
+        trial: "В простой программе сделать движущийся самолётик, добавить ветер и сравнить несколько моделей поведения."
+      },
+      {
+        id: "testing",
+        title: "Лётные испытания",
+        summary: "Как проверить, что аппарат работает в реальности и остаётся безопасным.",
+        tags: ["эксперименты", "команда", "техника", "ответственность"],
+        filters: ["Исследовать", "Планировать", "Анализировать"],
+        do: "Готовят программу испытаний, проверяют оборудование, проводят запуск, следят за безопасностью и изучают результат.",
+        task: "Проверить автоматическое возвращение аппарата при потере связи, не создавая опасной ситуации.",
+        like: ["настоящая техника", "командная работа", "подготовка важных экспериментов"],
+        tire: "Много подготовки, чек-листов и ответственности; сам эффектный запуск занимает небольшую часть работы.",
+        trial: "Составить чек-лист испытания бумажного планера и провести пять одинаковых запусков с записью результатов."
+      },
+      {
+        id: "data",
+        title: "Анализ полётных данных",
+        summary: "Как по телеметрии восстановить, что произошло во время полёта.",
+        tags: ["графики", "данные", "Python", "расследование"],
+        filters: ["Анализировать", "Программировать", "Исследовать"],
+        do: "Строят графики высоты, скорости и команд управления, находят необычные события и сравнивают полёты.",
+        task: "По записи датчиков выяснить, почему аппарат начал терять высоту в середине маршрута.",
+        like: ["задачи-расследования", "поиск закономерностей", "графики и доказательства"],
+        tire: "Иногда приходится долго очищать данные и проверять несколько возможных объяснений.",
+        trial: "Получить готовую таблицу виртуального полёта, построить три графика и найти момент возникновения ошибки."
+      },
+      {
+        id: "systems",
+        title: "Системная инженерия и миссии",
+        summary: "Как соединить все части аппарата ради реальной задачи.",
+        tags: ["общая картина", "планирование", "команда", "решения"],
+        filters: ["Планировать", "Анализировать", "Конструировать"],
+        do: "Определяют назначение аппарата, требования к дальности и безопасности, согласуют работу конструкции, электроники и программ.",
+        task: "Спроектировать беспилотник для поиска человека в лесу и решить, какие датчики, маршрут и время полёта нужны.",
+        like: ["видеть проект целиком", "соединять разные идеи", "обсуждать решения и выбирать компромиссы"],
+        tire: "Нужно много общаться, документировать решения и учитывать интересы разных специалистов.",
+        trial: "Составить одностраничный план спасательной миссии: задача, аппарат, датчики, маршрут, риски и критерий успеха."
+      }
+    ];
+
+    const filterNames = ["Все", "Исследовать", "Конструировать", "Программировать", "Собирать", "Моделировать", "Анализировать", "Планировать"];
+    const state = JSON.parse(localStorage.getItem("aviation-interest-map") || "{}");
+    let activeFilter = "Все";
+
+    const cardsEl = document.getElementById("cards");
+    const filtersEl = document.getElementById("filters");
+    const searchEl = document.getElementById("search");
+    const yesListEl = document.getElementById("yesList");
+    const interpretationEl = document.getElementById("interpretation");
+    const progressTextEl = document.getElementById("progressText");
+    const progressValueEl = document.getElementById("progressValue");
+    const toastEl = document.getElementById("toast");
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"]/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[char]));
+    }
+
+    function renderFilters() {
+      filtersEl.innerHTML = filterNames.map(name => `<button type="button" class="chip ${name === activeFilter ? "active" : ""}" data-filter="${escapeHtml(name)}">${escapeHtml(name)}</button>`).join("");
+      filtersEl.querySelectorAll("button").forEach(button => button.addEventListener("click", () => {
+        activeFilter = button.dataset.filter;
+        renderFilters();
+        applyFilters();
+      }));
+    }
+
+    function renderCards() {
+      cardsEl.innerHTML = directions.map((item, index) => `
+        <article class="card" id="card-${item.id}" data-id="${item.id}" data-search="${escapeHtml([item.title,item.summary,...item.tags,...item.filters,item.do,item.task].join(" ").toLowerCase())}" data-filters="${escapeHtml(item.filters.join("|"))}">
+          <button class="card-head" type="button" aria-expanded="false" aria-controls="body-${item.id}">
+            <span class="index">${String(index + 1).padStart(2,"0")}</span>
+            <span>
+              <h3>${escapeHtml(item.title)}</h3>
+              <p class="card-summary">${escapeHtml(item.summary)}</p>
+              <span class="tags">${item.tags.map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join("")}</span>
+            </span>
+            <span class="chevron" aria-hidden="true">⌄</span>
+          </button>
+          <div class="card-body" id="body-${item.id}">
+            <div class="detail-grid">
+              <div class="detail"><h4>Чем занимаются</h4><p>${escapeHtml(item.do)}</p></div>
+              <div class="detail"><h4>Типичная задача</h4><p>${escapeHtml(item.task)}</p></div>
+              <div class="detail"><h4>Может понравиться</h4><ul>${item.like.map(text => `<li>${escapeHtml(text)}</li>`).join("")}</ul></div>
+              <div class="detail"><h4>Может утомлять</h4><p>${escapeHtml(item.tire)}</p></div>
+              <div class="detail trial"><h4>Мини-проба</h4><p><strong>30–90 минут:</strong> ${escapeHtml(item.trial)}</p></div>
+            </div>
+            <div class="rating" aria-label="Оценить направление ${escapeHtml(item.title)}">
+              <button type="button" data-value="yes">Хочу попробовать</button>
+              <button type="button" data-value="maybe">Пока не знаю</button>
+              <button type="button" data-value="no">Скорее не моё</button>
+            </div>
+          </div>
+        </article>
+      `).join("");
+
+      cardsEl.querySelectorAll(".card").forEach(card => {
+        const head = card.querySelector(".card-head");
+        head.addEventListener("click", () => {
+          const open = card.classList.toggle("open");
+          head.setAttribute("aria-expanded", String(open));
+        });
+        card.querySelectorAll(".rating button").forEach(button => {
+          if (state[card.dataset.id] === button.dataset.value) button.classList.add("selected");
+          button.addEventListener("click", () => {
+            const id = card.dataset.id;
+            const value = button.dataset.value;
+            if (state[id] === value) delete state[id]; else state[id] = value;
+            localStorage.setItem("aviation-interest-map", JSON.stringify(state));
+            card.querySelectorAll(".rating button").forEach(item => item.classList.toggle("selected", state[id] === item.dataset.value));
+            updateResults();
+          });
+        });
+      });
+    }
+
+    function applyFilters() {
+      const query = searchEl.value.trim().toLowerCase();
+      cardsEl.querySelectorAll(".card").forEach(card => {
+        const filterMatch = activeFilter === "Все" || card.dataset.filters.split("|").includes(activeFilter);
+        const searchMatch = !query || card.dataset.search.includes(query);
+        card.classList.toggle("hidden", !(filterMatch && searchMatch));
+      });
+    }
+
+    function getInterpretation(selected) {
+      if (!selected.length) return "Начните с чтения нескольких карточек. Отмечать можно постепенно — выбор сохранится в этом браузере.";
+      const counts = {};
+      selected.forEach(item => item.filters.forEach(filter => counts[filter] = (counts[filter] || 0) + 1));
+      const top = Object.entries(counts).sort((a,b) => b[1] - a[1]).slice(0,3).map(([name]) => name.toLowerCase());
+      const mix = top.length > 1 ? `${top.slice(0,-1).join(", ")} и ${top.at(-1)}` : top[0];
+      return `Сейчас особенно заметен интерес к занятиям «${mix}». Это не вывод о профессии: выберите две разные мини-пробы из отмеченных направлений и сравните, хочется ли продолжить после практики.`;
+    }
+
+    function updateResults() {
+      const selected = directions.filter(item => state[item.id] === "yes");
+      const answered = Object.keys(state).filter(id => directions.some(item => item.id === id)).length;
+      progressTextEl.textContent = `${answered} из ${directions.length}`;
+      progressValueEl.style.width = `${answered / directions.length * 100}%`;
+      yesListEl.innerHTML = selected.length
+        ? selected.map(item => `<span class="result-pill">${escapeHtml(item.title)}</span>`).join("")
+        : `<span class="empty">Пока ничего не отмечено.</span>`;
+      interpretationEl.textContent = getInterpretation(selected);
+    }
+
+    function showToast(text) {
+      toastEl.textContent = text;
+      toastEl.classList.add("show");
+      window.clearTimeout(showToast.timer);
+      showToast.timer = window.setTimeout(() => toastEl.classList.remove("show"), 1800);
+    }
+
+    document.getElementById("copyResult").addEventListener("click", async () => {
+      const yes = directions.filter(item => state[item.id] === "yes").map(item => item.title);
+      const maybe = directions.filter(item => state[item.id] === "maybe").map(item => item.title);
+      const no = directions.filter(item => state[item.id] === "no").map(item => item.title);
+      const text = [
+        "Моя карта интересов в авиации",
+        "",
+        `Хочу попробовать: ${yes.length ? yes.join(", ") : "пока не выбрано"}`,
+        `Пока не знаю: ${maybe.length ? maybe.join(", ") : "—"}`,
+        `Скорее не моё: ${no.length ? no.join(", ") : "—"}`,
+        "",
+        interpretationEl.textContent
+      ].join("\n");
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast("Результат скопирован");
+      } catch {
+        showToast("Не удалось скопировать автоматически");
+      }
+    });
+
+    document.getElementById("resetResult").addEventListener("click", () => {
+      Object.keys(state).forEach(key => delete state[key]);
+      localStorage.removeItem("aviation-interest-map");
+      document.querySelectorAll(".rating button").forEach(button => button.classList.remove("selected"));
+      updateResults();
+      showToast("Отметки сброшены");
+    });
+
+    searchEl.addEventListener("input", applyFilters);
+    renderFilters();
+    renderCards();
+    updateResults();
+  </script>
+</body>
+</html>
