@@ -13,40 +13,53 @@
     <div class="shell">
       <div class="eyebrow">Путеводитель для 13 лет</div>
       <h1>Что в авиации может быть твоим?</h1>
-      <p>Это не тест на профессию. Здесь можно спокойно посмотреть, чем занимаются разные инженеры, отметить собственную реакцию и выбрать несколько маленьких проб.</p>
-      <div class="hero-actions">
-        <a class="primary" href="#directions">Смотреть направления</a>
-        <a class="secondary" href="#results">Перейти к результатам</a>
-      </div>
-      <div class="intro-grid" aria-label="Как пользоваться сайтом">
-        <div class="intro-card"><strong>Читайте по одной карточке</strong><span>Не нужно проходить всё за раз. Двух-трёх направлений за вечер достаточно.</span></div>
-        <div class="intro-card"><strong>Оценивайте процесс</strong><span>Не «красивая ли профессия», а хотелось бы заниматься такими задачами самой.</span></div>
-        <div class="intro-card"><strong>Проверяйте мини-пробой</strong><span>Интерес лучше выясняется в небольшом деле, а не по одному описанию.</span></div>
-      </div>
+      <p>Авиация — это не одна профессия. Здесь можно исследовать воздух, конструировать детали, программировать автопилот, собирать электронику, испытывать технику или расследовать данные полёта.</p>
+      <a class="primary" href="#directions">Посмотреть направления</a>
     </div>
   </header>
 
   <main class="shell">
-    <div class="toolbar-wrap" aria-label="Фильтры направлений">
-      <div class="toolbar">
-        <input class="search" id="search" type="search" placeholder="Найти: программирование, 3D, эксперименты…" aria-label="Поиск по направлениям">
-        <div class="filter-row" id="filters"></div>
-      </div>
-    </div>
+    <section class="intro-grid" aria-label="Как пользоваться путеводителем">
+      <article class="intro-card">
+        <span>1</span>
+        <div><h2>Открывай карточки</h2><p>Необязательно читать всё подряд. Начни с названий, которые вызывают любопытство.</p></div>
+      </article>
+      <article class="intro-card">
+        <span>2</span>
+        <div><h2>Смотри и пробуй</h2><p>В каждой карточке есть короткий ролик и мини-задача, которую можно попробовать за один вечер.</p></div>
+      </article>
+      <article class="intro-card">
+        <span>3</span>
+        <div><h2>Отмечай ощущение</h2><p>Выбирай: хочется попробовать, пока неясно или скорее не твоё. Ответ можно изменить.</p></div>
+      </article>
+    </section>
 
-    <section id="directions">
+    <section id="directions" class="directions-section">
       <div class="section-head">
-        <h2>Направления</h2>
-        <p>Открывайте карточки, смотрите на типичные задачи и отмечайте первое честное впечатление.</p>
+        <div>
+          <div class="eyebrow dark">14 разных способов заниматься авиацией</div>
+          <h2>Что именно делают инженеры</h2>
+        </div>
+        <p>Фильтры показывают не профессии, а характер деятельности. Так легче заметить, что нравится: код, эксперименты, работа руками или поиск закономерностей.</p>
       </div>
+
+      <div class="toolbar">
+        <label class="search-box">
+          <span>Найти направление</span>
+          <input id="search" type="search" placeholder="Например: программирование, крыло, данные…" autocomplete="off">
+        </label>
+        <div class="filter-row" id="filters" aria-label="Фильтр по занятиям"></div>
+      </div>
+
       <div class="cards" id="cards"></div>
     </section>
 
-    <section class="results" id="results" aria-live="polite">
+    <section class="results" aria-live="polite">
       <div class="results-head">
         <div>
-          <h2>Моя карта интересов</h2>
-          <p class="lead">Результат не выбирает профессию. Он лишь показывает, какие виды занятий стоит попробовать на практике первыми.</p>
+          <div class="eyebrow light">Не выбор профессии, а карта любопытства</div>
+          <h2>Мои первые сигналы интереса</h2>
+          <p class="lead">Отметки сохраняются только в этом браузере. После мини-проб полезно вернуться и изменить ответы.</p>
         </div>
       </div>
       <div class="progress">
@@ -75,7 +88,7 @@
   </footer>
   <div class="toast" id="toast" role="status"></div>
   <script src="directions.js"></script>
-  <script src="videos.js"></script>
+  <script src="videos.js?v=2"></script>
   <script src="app.js"></script>
 </body>
 </html>
